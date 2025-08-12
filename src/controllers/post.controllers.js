@@ -2,9 +2,11 @@ const generateCaption = require("../services/ai.service");
 const postModel = require("../models/post.model");
 const uploadImage = require("../services/cloud.service");
 const { v4: uuidv4 } = require("uuid");
+const CommentModel = require("../models/comment.model");
+const PostModel = require("../models/post.model");
+const LikeModel = require("../models/like.model");
 
 async function createPostController(req, res) {
-  
   try {
     const file = req.file;
 
@@ -22,7 +24,7 @@ async function createPostController(req, res) {
       uploadImage(file.buffer, uuidv4()),
     ]);
 
-    const post = new postModel({
+    const post = await postModel.create({
       image: url,
       caption: caption,
       user: req.user._id,
@@ -47,6 +49,109 @@ async function createPostController(req, res) {
   }
 }
 
+async function createCommentController(req, res) {
+  try {
+    const { comment, postId } = req.body;
+
+    if (!comment || !postId) {
+      return res
+        .status(400)
+        .json({ message: "Comment and postId are required" });
+    }
+
+    const isPostExist = await PostModel.findById(postId);
+    if (!isPostExist) {
+      return res.status(404).json({ message: "Post not found." });
+    }
+
+    await CommentModel.create({
+      comment,
+      post: postId,
+      user: req.user._id,
+    });
+
+    return res.status(201).json({
+      message: "Comment created successfully.",
+    });
+  } catch (error) {
+    console.error("Error creating comment:", error);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+}
+
+async function getCommentController(req, res) {
+  try {
+    const { postId } = req.body;
+
+    if (!postId) {
+      return res.status(400).json({
+        message: "Post Id is required.",
+      });
+    }
+
+    const comments = await CommentModel.find({ post: postId })
+      .populate("user", "username") // sirf required user fields
+      .sort({ createdAt: -1 }); // latest first
+
+    return res.status(200).json({
+      message: "Comments fetched successfully.",
+      comments,
+    });
+  } catch (error) {
+    console.error("Error getting comments:", error);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+}
+
+async function CreateLikeController(req, res) {
+  try {
+    const { postId } = req.params;
+    if (!postId) {
+      return res.status(401).json({
+        message: "Post id not Found",
+      });
+    }
+    const post = await postModel.findById(postId);
+
+    if (!post) {
+      return res.status(401).json({
+        message: "Post not found",
+      });
+    }
+
+    const existingLike = await LikeModel.findOne({
+      post: postId,
+      user: req.user._id,
+    });
+
+    if (existingLike) {
+      return res.status(400).json({ message: "Already liked this post." });
+    }
+
+    const newLike = await LikeModel.create({
+      post: postId,
+      user: req.user._id,
+    });
+
+    post.likesCount += 1;
+    await post.save();
+
+    return res.status(201).json({
+      message: "Like added successfully.",
+      like: newLike,
+      likesCount: post.likesCount,
+    });
+    
+  } catch (error) {
+    return res.status(500).json({
+      message: "Interval Server Error",
+    });
+  }
+}
+
 module.exports = {
   createPostController,
+  createCommentController,
+  getCommentController,
+  CreateLikeController,
 };
