@@ -103,18 +103,18 @@ async function getCommentController(req, res) {
   }
 }
 
-async function CreateLikeController(req, res) {
+async function LikeController(req, res) {
   try {
     const { postId } = req.params;
     if (!postId) {
-      return res.status(401).json({
+      return res.status(400).json({
         message: "Post id not Found",
       });
     }
     const post = await postModel.findById(postId);
 
     if (!post) {
-      return res.status(401).json({
+      return res.status(404).json({
         message: "Post not found",
       });
     }
@@ -125,7 +125,7 @@ async function CreateLikeController(req, res) {
     });
 
     if (existingLike) {
-      return res.status(400).json({ message: "Already liked this post." });
+      return res.status(200).json({ message: "Already liked this post." });
     }
 
     const newLike = await LikeModel.create({
@@ -133,7 +133,8 @@ async function CreateLikeController(req, res) {
       user: req.user._id,
     });
 
-    post.likesCount += 1;
+      post.likesCount += 1;
+
     await post.save();
 
     return res.status(201).json({
@@ -141,7 +142,6 @@ async function CreateLikeController(req, res) {
       like: newLike,
       likesCount: post.likesCount,
     });
-    
   } catch (error) {
     return res.status(500).json({
       message: "Interval Server Error",
@@ -149,9 +149,52 @@ async function CreateLikeController(req, res) {
   }
 }
 
+async function DisLikeController(req, res) {
+  try {
+    const { postId } = req.params;
+
+    if (!postId) {
+      return res.status(400).json({ message: "Post ID is required" });
+    }
+
+    const post = await postModel.findById(postId);
+
+    if (!post) {
+      return res.status(404).json({ message: "Post not found" });
+    }
+
+    const existingLike = await LikeModel.findOne({
+      post: postId,
+      user: req.user._id,
+    });
+
+    if (!existingLike) {
+      return res.status(400).json({ message: "You have not liked this post yet" });
+    }
+
+    await LikeModel.findOneAndDelete({
+      post: postId,
+      user: req.user._id,
+    });
+
+    if (post.likesCount > 0) {
+      post.likesCount -= 1;
+    }
+    
+    await post.save();
+
+    return res.status(200).json({ message: "Post disliked successfully" });
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+}
+
 module.exports = {
   createPostController,
   createCommentController,
   getCommentController,
-  CreateLikeController,
+  LikeController,
+  DisLikeController,
 };
