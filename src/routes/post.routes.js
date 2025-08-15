@@ -7,7 +7,8 @@ const {
   createPostController,
   createCommentController,
   getCommentController,
-  CreateLikeController,
+  LikeController,
+  DisLikeController
 } = require("../controllers/post.controllers");
 
 const multer = require("multer");
@@ -18,6 +19,8 @@ router.post("/", AuthMiddleware, upload.single("image"), createPostController);
 router.post("/comment", AuthMiddleware, createCommentController);
 router.get("/comments", getCommentController);
 
-router.post("/like/:postId", AuthMiddleware, CreateLikeController);
+router.post("/like/:postId", AuthMiddleware, LikeController);
+
+router.post("/dislike/:postId", AuthMiddleware, DisLikeController);
 
 module.exports = router;
