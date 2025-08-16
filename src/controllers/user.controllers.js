@@ -55,7 +55,61 @@ async function UpdateUserProfile(req, res) {
   }
 }
 
+async function SearchUsers(req, res) {
+  const { query } = req.query;
+
+  if (!query) return res.status(200).json([]);
+
+  try {
+    const users = await UserProfileModel.aggregate([
+      {
+        $lookup: {
+          from: "users", // join with User collection
+          localField: "userId", // field in UserProfile
+          foreignField: "_id", // field in User
+          as: "userData", // alias
+        },
+      },
+      { $unwind: "$userData" },
+      {
+        $match: {
+          $or: [
+            { displayName: { $regex: query, $options: "i" } },
+            { "userData.username": { $regex: query, $options: "i" } },
+          ],
+        },
+      },
+      {
+        $project: {
+          _id: 1,
+          displayName: 1,
+          "userData.username": 1,
+          "userData._id": 1,
+          avatarUrl:1,
+        },
+      },
+      { $limit: 10 },
+    ]);
+
+    if (users.length === 0) {
+      return res.status(200).json({
+        message: "No User Found.",
+        users: [],
+      });
+    }
+
+    return res.status(200).json({
+      users,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      message: "Internal Server error.",
+    });
+  }
+}
+
 module.exports = {
   getUserProfile,
   UpdateUserProfile,
+  SearchUsers,
 };
