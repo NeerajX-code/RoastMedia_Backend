@@ -133,7 +133,7 @@ async function LikeController(req, res) {
       user: req.user._id,
     });
 
-      post.likesCount += 1;
+    post.likesCount += 1;
 
     await post.save();
 
@@ -169,7 +169,9 @@ async function DisLikeController(req, res) {
     });
 
     if (!existingLike) {
-      return res.status(400).json({ message: "You have not liked this post yet" });
+      return res
+        .status(400)
+        .json({ message: "You have not liked this post yet" });
     }
 
     await LikeModel.findOneAndDelete({
@@ -180,11 +182,10 @@ async function DisLikeController(req, res) {
     if (post.likesCount > 0) {
       post.likesCount -= 1;
     }
-    
+
     await post.save();
 
     return res.status(200).json({ message: "Post disliked successfully" });
-
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: "Internal server error" });
