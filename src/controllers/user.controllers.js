@@ -1,8 +1,7 @@
 const UserProfileModel = require("../models/userProfile.model");
 
 async function getUserProfile(req, res) {
-  const user = req.user; // Assuming req.user is set by auth middleware
-
+  const user = req.user; 
   try {
     const userProfile = await UserProfileModel.findOne({
       userId: user._id,
