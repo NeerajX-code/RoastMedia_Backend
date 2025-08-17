@@ -11,10 +11,16 @@ const app = express();
 
 app.use(express.json());
 app.use(cookieParser());
+
+const allowedOrigins = [
+  "http://localhost:5173",
+  "https://roastmedia-frontend.onrender.com", // Replace with actual frontend URL
+];
+
 app.use(
   cors({
-    origin: "http://localhost:5173", // frontend ka URL
-    credentials: true, // cookies allow
+    origin: allowedOrigins,
+    credentials: true,
   })
 );
 
