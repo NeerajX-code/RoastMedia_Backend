@@ -7,7 +7,6 @@ var imagekit = new ImageKit({
 });
 
 async function uploadImage(file, filename) {
-    
   const response = await imagekit
     .upload({
       file: file,
@@ -17,7 +16,23 @@ async function uploadImage(file, filename) {
       console.log(error);
     });
 
-  return response.url;
+  return {
+    fileId: response.fileId,
+    url: response.url,
+  };
 }
 
-module.exports = uploadImage;
+async function deleteImage(fileId) {
+  return new Promise((resolve, reject) => {
+    imagekit.deleteFile(fileId, function (error, result) {
+      if (error) {
+        console.error("Image delete error:", error);
+        reject(error);
+      } else {
+        resolve(result);
+      }
+    });
+  });
+}
+
+module.exports = { uploadImage, deleteImage };

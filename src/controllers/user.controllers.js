@@ -1,4 +1,6 @@
 const UserProfileModel = require("../models/userProfile.model");
+const { uploadImage, deleteImage } = require("../services/cloud.service");
+const { v4: uuidv4 } = require("uuid");
 
 async function getUserProfile(req, res) {
   const user = req.user; // Assuming req.user is set by auth middleware
@@ -26,32 +28,63 @@ async function getUserProfile(req, res) {
 
 async function UpdateUserProfile(req, res) {
   const user = req.user;
+  const file = req.file;
 
   try {
-    // Find the user's profile
-    let userProfile = await UserProfileModel.findOne({ userId: user._id });
+    // Get fields from body
+    const { displayName, bio } = req.body;
 
+    // If nothing to update, return early
+    if (!file && displayName === undefined && bio === undefined) {
+      return res.status(400).json({ message: "No fields provided to update." });
+    }
+
+    // Find existing profile first
+    const userProfile = await UserProfileModel.findOne({ userId: user._id });
     if (!userProfile) {
       return res.status(404).json({ message: "Profile not found." });
     }
 
-    // Get all fields from body
-    const { displayName, avatarUrl, bio } = req.body;
+    // Update fields if provided
+    if (displayName !== undefined) {
+      if (displayName.trim() === "") {
+        return res
+          .status(400)
+          .json({ message: "Display name cannot be empty." });
+      }
+      userProfile.displayName = displayName;
+    }
 
-    if (displayName !== undefined) userProfile.displayName = displayName;
-    if (avatarUrl !== undefined) userProfile.avatarUrl = avatarUrl;
-    if (bio !== undefined) userProfile.bio = bio;
+    if (bio !== undefined) {
+      userProfile.bio = bio;
+    }
 
+    if (file) {
+      // Delete old avatar if exists
+      if (userProfile.avatarFieldId) {
+        try {
+          await deleteImage(userProfile.avatarFieldId);
+        } catch (err) {
+          console.error("Error deleting old avatar:", err);
+        }
+      }
+
+      // Upload new avatar
+      const { fileId, url } = await uploadImage(file.buffer, uuidv4());
+      userProfile.avatarFieldId = fileId;
+      userProfile.avatarUrl = url;
+    }
+
+    // Save updated profile
     await userProfile.save();
 
-    res.json({
+    return res.status(200).json({
       message: "Profile updated successfully.",
       userProfile,
     });
   } catch (error) {
-    return res.status(500).json({
-      message: "Internal Server Error.",
-    });
+    console.error("UpdateUserProfile Error:", error);
+    return res.status(500).json({ message: "Internal Server Error." });
   }
 }
 
@@ -85,7 +118,7 @@ async function SearchUsers(req, res) {
           displayName: 1,
           "userData.username": 1,
           "userData._id": 1,
-          avatarUrl:1,
+          avatarUrl: 1,
         },
       },
       { $limit: 10 },

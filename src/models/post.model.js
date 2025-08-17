@@ -5,10 +5,12 @@ const postSchema = new mongoose.Schema({
   caption: { type: String, required: true },
   user: {
     type: mongoose.Schema.Types.ObjectId,
-    ref:"User",
+    ref: "User",
     required: true,
   },
   likesCount: { type: Number, default: 0 },
+  commentCount: { type: Number, default: 0 },
+  shareCount: { type: Number, default: 0 },
 });
 
 const PostModel = mongoose.model("Post", postSchema);
