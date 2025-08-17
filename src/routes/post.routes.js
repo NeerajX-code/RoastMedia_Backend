@@ -8,7 +8,8 @@ const {
   createCommentController,
   getCommentController,
   LikeController,
-  DisLikeController
+  DisLikeController,
+  asyncGenerateCaption,
 } = require("../controllers/post.controllers");
 
 const multer = require("multer");
@@ -23,4 +24,10 @@ router.post("/like/:postId", AuthMiddleware, LikeController);
 
 router.post("/dislike/:postId", AuthMiddleware, DisLikeController);
 
+router.post(
+  "/generateCaption",
+  AuthMiddleware,
+  upload.single("image"),
+  asyncGenerateCaption
+);
 module.exports = router;

@@ -192,10 +192,39 @@ async function DisLikeController(req, res) {
   }
 }
 
+async function asyncGenerateCaption(req, res) {
+  const file = req.file;
+
+  console.log(file);
+  
+
+  if (!file) {
+    return res.status(400).json({ message: "No image file provided" });
+  }
+
+  const base64ImageFile = file.buffer.toString("base64");
+
+  try {
+    const response = await generateCaption(base64ImageFile);
+    console.log(response);
+    
+    res.status(201).json({
+      message : "Caption generated successfully.",
+      response
+    })
+    
+  } catch (error) {
+    res.status(404).json({
+      message : "unable to generate caption."
+    })
+  }
+}
+
 module.exports = {
   createPostController,
   createCommentController,
   getCommentController,
   LikeController,
   DisLikeController,
+  asyncGenerateCaption,
 };
