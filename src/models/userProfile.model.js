@@ -14,7 +14,7 @@ const userProfileSchema = new mongoose.Schema(
       default:
         "https://ik.imagekit.io/nkde9n0dc/AiCaption/4140061.png?updatedAt=1755237167132",
     },
-
+    avatarFieldId: { type: String, default: null },
     followersCount: { type: Number, default: 0 },
     followingCount: { type: Number, default: 0 },
   },

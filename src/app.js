@@ -14,7 +14,8 @@ app.use(cookieParser());
 
 const allowedOrigins = [
   "http://localhost:5173",
-  "https://roastmedia-frontend.onrender.com", // Replace with actual frontend URL
+  "https://roastmedia-frontend.onrender.com",
+  "https://kj5qc8fs-5173.inc1.devtunnels.ms"
 ];
 
 app.use(
