@@ -59,13 +59,17 @@ async function UpdateUserProfile(req, res) {
     if (bio !== undefined) userProfile.bio = bio;
 
     if (file) {
-      const url = await uploadImage(file.buffer, uuidv4());
+      const { url, fileId } = await uploadImage(file.buffer, uuidv4());
+
+      userProfile.avatarFieldId &&
+        (await deleteImage(userProfile.avatarFieldId));
+
       userProfile.avatarUrl = url;
+      userProfile.avatarFieldId = fileId;
     }
 
     await userProfile.save();
 
-    
     return res.status(200).json({
       message: "Profile updated successfully.",
       profile: userProfile.toObject(),
