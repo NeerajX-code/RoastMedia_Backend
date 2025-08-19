@@ -4,6 +4,7 @@ const {
   getUserProfile,
   UpdateUserProfile,
   SearchUsers,
+  getUserProfilebyId,
 } = require("../controllers/user.controllers");
 const multer = require("multer");
 const upload = multer({ storage: multer.memoryStorage() });
@@ -18,5 +19,6 @@ router.patch(
   UpdateUserProfile
 );
 router.get("/find", SearchUsers);
+router.get("/get/userProfile/:id", getUserProfilebyId);
 
 module.exports = router;

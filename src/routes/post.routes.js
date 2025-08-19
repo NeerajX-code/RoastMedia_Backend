@@ -10,6 +10,8 @@ const {
   LikeController,
   DisLikeController,
   asyncGenerateCaption,
+  asyncGetPosts,
+  GetPostsByUserId
 } = require("../controllers/post.controllers");
 
 const multer = require("multer");
@@ -24,10 +26,16 @@ router.post("/like/:postId", AuthMiddleware, LikeController);
 
 router.post("/dislike/:postId", AuthMiddleware, DisLikeController);
 
+
+
 router.post(
   "/generateCaption",
   AuthMiddleware,
   upload.single("image"),
   asyncGenerateCaption
 );
+
+router.get("/get/random", asyncGetPosts);
+router.get("/get/posts/user/:id",GetPostsByUserId);
+
 module.exports = router;

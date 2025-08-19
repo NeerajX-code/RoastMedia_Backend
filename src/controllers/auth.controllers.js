@@ -45,6 +45,7 @@ async function registerController(req, res) {
         id: user._id,
         username: user.username,
       },
+      token,
     });
   } catch (err) {
     console.error("Error registering user:", err);
@@ -77,6 +78,7 @@ async function loginController(req, res) {
 
   return res.status(200).json({
     message: "User logged in successfully",
+    token,
   });
 }
 
