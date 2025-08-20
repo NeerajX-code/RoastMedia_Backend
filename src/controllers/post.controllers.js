@@ -195,6 +195,7 @@ async function DisLikeController(req, res) {
 
 async function asyncGenerateCaption(req, res) {
   const file = req.file;
+  const { personality } = req.body;
 
   console.log(file);
 
@@ -205,7 +206,7 @@ async function asyncGenerateCaption(req, res) {
   const base64ImageFile = file.buffer.toString("base64");
 
   try {
-    const response = await generateCaption(base64ImageFile);
+    const response = await generateCaption(base64ImageFile, personality);
     console.log(response);
 
     res.status(201).json({
