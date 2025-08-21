@@ -17,9 +17,6 @@ async function createPostController(req, res) {
 
     const base64ImageFile = file.buffer.toString("base64");
 
-    // const caption = await generateCaption(base64ImageFile);
-    // const url = await uploadImage(file.buffer, uuidv4());
-
     const [caption, url] = await Promise.all([
       generateCaption(base64ImageFile),
       uploadImage(file.buffer, uuidv4()),
@@ -197,8 +194,6 @@ async function asyncGenerateCaption(req, res) {
   const file = req.file;
   const { personality } = req.body;
 
-  console.log(file);
-
   if (!file) {
     return res.status(400).json({ message: "No image file provided" });
   }
@@ -207,7 +202,6 @@ async function asyncGenerateCaption(req, res) {
 
   try {
     const response = await generateCaption(base64ImageFile, personality);
-    console.log(response);
 
     res.status(201).json({
       message: "Caption generated successfully.",
@@ -284,8 +278,7 @@ async function asyncGetPosts(req, res) {
 
 async function GetPostsByUserId(req, res) {
   const { id } = req.params;
-  console.log(id);
-
+ 
   try {
     const posts = await postModel.find({ user: new Types.ObjectId(id) });
 
@@ -295,8 +288,6 @@ async function GetPostsByUserId(req, res) {
         posts: [],
       });
     }
-
-    console.log(posts);
 
     return res.status(200).json({
       message: "Posts got successfully.",
