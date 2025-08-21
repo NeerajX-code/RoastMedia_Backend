@@ -24,6 +24,7 @@ app.use(
     credentials: true,
   })
 );
+app.use(cors(allowedOrigins));
 
 app.use("/api/auth", authRouter);
 app.use("/api/post", postRouter);
