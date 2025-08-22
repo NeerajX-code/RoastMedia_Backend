@@ -1,6 +1,10 @@
 const express = require("express");
 const router = express.Router();
-const AuthMiddleware = require("../middleware/auth.middleware");
+const {
+  authMiddleware,
+  isUserMiddleware
+} = require("../middleware/auth.middleware");
+
 const multer = require("multer");
 const {
   createPostController,
@@ -10,32 +14,29 @@ const {
   DisLikeController,
   asyncGenerateCaption,
   asyncGetPosts,
-  GetPostsByUserId
+  GetPostsByUserId,
 } = require("../controllers/post.controllers");
-
 
 const upload = multer({ storage: multer.memoryStorage() });
 
-router.post("/", AuthMiddleware, upload.single("image"), createPostController);
+router.post("/", authMiddleware, upload.single("image"), createPostController);
 
-router.post("/comment", AuthMiddleware, createCommentController);
+router.post("/comment", authMiddleware, createCommentController);
 
 router.get("/comments", getCommentController);
 
-router.post("/like/:postId", AuthMiddleware, LikeController);
+router.patch("/like/:id", authMiddleware, LikeController);
 
-router.post("/dislike/:postId", AuthMiddleware, DisLikeController);
-
-
+router.post("/dislike/:id", authMiddleware, DisLikeController);
 
 router.post(
   "/generateCaption",
-  AuthMiddleware,
+  authMiddleware,
   upload.single("image"),
   asyncGenerateCaption
 );
 
-router.get("/get/random", asyncGetPosts);
-router.get("/get/posts/user/:id",GetPostsByUserId);
+router.get("/get/random", isUserMiddleware, asyncGetPosts);
+router.get("/get/posts/user/:id", GetPostsByUserId);
 
 module.exports = router;

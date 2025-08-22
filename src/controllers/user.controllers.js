@@ -117,7 +117,7 @@ async function SearchUsers(req, res) {
     ]);
 
     if (users.length === 0) {
-      return res.status(200).json({
+      return res.status(404).json({
         message: "No User Found.",
         users: [],
       });

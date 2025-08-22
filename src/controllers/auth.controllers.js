@@ -27,12 +27,7 @@ async function registerController(req, res) {
     });
 
     // Create JWT token
-    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
-      secure: process.env.NODE_ENV === "production", // ✅ prod me true
-      sameSite: "none", // ✅ cross-domain frontend-backend ke liye zaroori
-      httpOnly: true, // ✅ JS se access nahi hoga
-      maxAge: 1000 * 60 * 60 * 24,
-    });
+    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET);
 
     // Create user profile with defaults
     await UserProfileModel.create({
@@ -40,11 +35,7 @@ async function registerController(req, res) {
     });
 
     // Set cookie
-    res.cookie("token", token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-    });
+    res.cookie("token", token);
 
     return res.status(201).json({
       message: "User registered successfully",
@@ -77,16 +68,9 @@ async function loginController(req, res) {
     return res.status(401).json({ message: "Invalid password" });
   }
 
-  const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
-    expiresIn: "7d",
-  });
+  const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET);
 
-  res.cookie("token", token, {
-    secure: process.env.NODE_ENV === "production", // ✅ prod me true
-    sameSite: "none", // ✅ cross-domain frontend-backend ke liye zaroori
-    httpOnly: true, // ✅ JS se access nahi hoga
-    maxAge: 1000 * 60 * 60 * 24,
-  });
+  res.cookie("token", token);
 
   return res.status(200).json({
     message: "User logged in successfully",

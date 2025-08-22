@@ -106,13 +106,14 @@ async function getCommentController(req, res) {
 
 async function LikeController(req, res) {
   try {
-    const { postId } = req.params;
-    if (!postId) {
+    const { id } = req.params;
+    console.log(id)
+    if (!id) {
       return res.status(400).json({
         message: "Post id not Found",
       });
     }
-    const post = await postModel.findById(postId);
+    const post = await postModel.findById(id);
 
     if (!post) {
       return res.status(404).json({
@@ -121,7 +122,7 @@ async function LikeController(req, res) {
     }
 
     const existingLike = await LikeModel.findOne({
-      post: postId,
+      post: id,
       user: req.user._id,
     });
 
@@ -130,7 +131,7 @@ async function LikeController(req, res) {
     }
 
     const newLike = await LikeModel.create({
-      post: postId,
+      post: id,
       user: req.user._id,
     });
 
@@ -268,11 +269,34 @@ async function asyncGetPosts(req, res) {
       },
     ]);
 
+    const postIds = posts.map((p) => p._id);
+
+    // Step 3: Find which posts the logged-in user liked
+    let likedDocs = [];
+
+    
+    if (req.user) {
+      likedDocs = await LikeModel.find({
+        userId: req.user._id,
+        postId: { $in: postIds },
+      }).select("postId");
+    }
+
+    // Step 4: Make a Set for fast lookup
+    const likedSet = new Set(likedDocs.map((doc) => doc.postId.toString()));
+
+    // Step 5: Inject isLiked into posts
+    posts = posts.map((p) => ({
+      ...p,
+      isLiked: likedSet.has(p._id.toString()),
+    }));
+
     return res.status(200).json({
       success: true,
       count: posts.length,
       posts,
     });
+
   } catch (error) {
     console.error("Error fetching posts:", error);
     return res.status(500).json({
@@ -290,7 +314,7 @@ async function GetPostsByUserId(req, res) {
     const posts = await postModel.find({ user: new Types.ObjectId(id) });
 
     if (!posts || posts.length === 0) {
-      return res.status(404).json({
+      return res.status(200).json({
         message: "No Post found",
         posts: [],
       });
