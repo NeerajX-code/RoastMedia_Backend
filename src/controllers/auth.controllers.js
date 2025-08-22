@@ -27,12 +27,13 @@ async function registerController(req, res) {
     });
 
     // Create JWT token
-    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
-      secure: process.env.NODE_ENV === "production", // ✅ prod me true
-      sameSite: "none", // ✅ cross-domain frontend-backend ke liye zaroori
-      httpOnly: true, // ✅ JS se access nahi hoga
-      maxAge: 1000 * 60 * 60 * 24,
-    });
+    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET);
+    //    {
+    //   // secure: process.env.NODE_ENV === "production", // ✅ prod me true
+    //   sameSite: "none", // ✅ cross-domain frontend-backend ke liye zaroori
+    //   httpOnly: false, // ✅ JS se access nahi hoga
+    //   maxAge: 1000 * 60 * 60 * 24,
+    // });
 
     // Create user profile with defaults
     await UserProfileModel.create({
@@ -67,6 +68,8 @@ async function loginController(req, res) {
     $or: [{ username: identifier }, { email: identifier }],
   });
 
+  console.log(user);
+
   if (!user) {
     return res.status(404).json({ message: "User not found" });
   }
@@ -81,12 +84,13 @@ async function loginController(req, res) {
     expiresIn: "7d",
   });
 
-  res.cookie("token", token, {
-    secure: process.env.NODE_ENV === "production", // ✅ prod me true
-    sameSite: "none", // ✅ cross-domain frontend-backend ke liye zaroori
-    httpOnly: true, // ✅ JS se access nahi hoga
-    maxAge: 1000 * 60 * 60 * 24,
-  });
+  res.cookie("token", token);
+  //   {
+  //   secure: process.env.NODE_ENV === "production", // ✅ prod me true
+  //   sameSite: "none", // ✅ cross-domain frontend-backend ke liye zaroori
+  //   httpOnly: true, // ✅ JS se access nahi hoga
+  //   maxAge: 1000 * 60 * 60 * 24,
+  // });
 
   return res.status(200).json({
     message: "User logged in successfully",

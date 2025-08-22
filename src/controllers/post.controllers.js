@@ -1,6 +1,6 @@
 const generateCaption = require("../services/ai.service");
 const postModel = require("../models/post.model");
-const uploadImage = require("../services/cloud.service");
+const { uploadImage } = require("../services/cloud.service");
 const { v4: uuidv4 } = require("uuid");
 const CommentModel = require("../models/comment.model");
 const PostModel = require("../models/post.model");
@@ -10,34 +10,37 @@ const { Types } = require("mongoose");
 async function createPostController(req, res) {
   try {
     const file = req.file;
+    const { showCurrentCaption } = req.body;
+    const user = req.user;
 
-    if (!file) {
-      return res.status(400).json({ message: "No image file provided" });
+    console.log("req.file:", req.file);
+    console.log("req.body:", req.body);
+
+    if (!file || !showCurrentCaption) {
+      return res.status(400).json({ message: "No content provided" });
     }
 
-    const base64ImageFile = file.buffer.toString("base64");
-
-    const [caption, url] = await Promise.all([
-      generateCaption(base64ImageFile),
-      uploadImage(file.buffer, uuidv4()),
-    ]);
-
+    const url = await uploadImage(file.buffer, uuidv4());
+  
     const post = await postModel.create({
-      image: url,
-      caption: caption,
-      user: req.user._id,
+      user: user._id,
+      image: url.url,
+      caption: showCurrentCaption,
     });
 
-    return res.status(200).json({
-      caption,
+    return res.status(201).json({
       post: {
         postId: post._id,
-        image: url,
-        caption: caption,
+        image: url.url,
+        caption: showCurrentCaption,
         user: {
-          userId: req.user._id,
-          username: req.user.username,
+          userId: user._id,
+          username: user.username,
         },
+        likesCount: 0,
+        commentCount: 0,
+        saveCount: 0,
+        shareCount: 0,
       },
     });
   } catch (error) {
@@ -194,8 +197,8 @@ async function asyncGenerateCaption(req, res) {
   const file = req.file;
   const { personality } = req.body;
 
-  if (!file) {
-    return res.status(400).json({ message: "No image file provided" });
+  if (!file || !personality) {
+    return res.status(400).json({ message: "No content provided" });
   }
 
   const base64ImageFile = file.buffer.toString("base64");
@@ -278,7 +281,7 @@ async function asyncGetPosts(req, res) {
 
 async function GetPostsByUserId(req, res) {
   const { id } = req.params;
- 
+
   try {
     const posts = await postModel.find({ user: new Types.ObjectId(id) });
 
