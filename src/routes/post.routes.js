@@ -10,8 +10,7 @@ const {
   createPostController,
   createCommentController,
   getCommentController,
-  LikeController,
-  DisLikeController,
+  ToggleLikeController,
   asyncGenerateCaption,
   asyncGetPosts,
   GetPostsByUserId,
@@ -25,10 +24,7 @@ router.post("/comment", authMiddleware, createCommentController);
 
 router.get("/comments", getCommentController);
 
-router.patch("/like/:id", authMiddleware, LikeController);
-
-router.post("/dislike/:id", authMiddleware, DisLikeController);
-
+router.patch("/like/:postId", authMiddleware, ToggleLikeController);
 router.post(
   "/generateCaption",
   authMiddleware,

@@ -34,8 +34,14 @@ async function registerController(req, res) {
       userId: user._id,
     });
 
-    // Set cookie
-    res.cookie("token", token);
+    const isProduction = process.env.NODE_ENV === "production";
+
+    res.cookie("token", token, {
+      httpOnly: true, // JS se access na ho
+      secure: isProduction, // sirf production me https par
+      sameSite: isProduction ? "none" : "lax", // dev me lax, prod me none
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 din
+    });
 
     return res.status(201).json({
       message: "User registered successfully",
@@ -70,7 +76,14 @@ async function loginController(req, res) {
 
   const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET);
 
-  res.cookie("token", token);
+  const isProduction = process.env.NODE_ENV === "production";
+
+  res.cookie("token", token, {
+    httpOnly: true, // JS se access na ho
+    secure: isProduction, // sirf production me https par
+    sameSite: isProduction ? "none" : "lax", // dev me lax, prod me none
+    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 din
+  });
 
   return res.status(200).json({
     message: "User logged in successfully",
@@ -78,7 +91,23 @@ async function loginController(req, res) {
   });
 }
 
+async function logoutController(req, res) {
+  try {
+    res.clearCookie("token", {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+    });
+
+    return res.status(200).json({ message: "Logged out successfully" });
+  } catch (error) {
+    console.error("Logout error:", error);
+    return res.status(500).json({ message: "Server error during logout" });
+  }
+}
+
 module.exports = {
   registerController,
   loginController,
+  logoutController,
 };
