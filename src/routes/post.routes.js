@@ -2,7 +2,7 @@ const express = require("express");
 const router = express.Router();
 const {
   authMiddleware,
-  isUserMiddleware
+  isUserMiddleware,
 } = require("../middleware/auth.middleware");
 
 const multer = require("multer");
@@ -14,9 +14,11 @@ const {
   asyncGenerateCaption,
   asyncGetPosts,
   GetPostsByUserId,
+  GetPostsByUserId,
 } = require("../controllers/post.controllers");
 
 const upload = multer({ storage: multer.memoryStorage() });
+console.log(upload);
 
 router.post("/", authMiddleware, upload.single("image"), createPostController);
 
@@ -25,6 +27,7 @@ router.post("/comment", authMiddleware, createCommentController);
 router.get("/comments", getCommentController);
 
 router.patch("/like/:postId", authMiddleware, ToggleLikeController);
+
 router.post(
   "/generateCaption",
   authMiddleware,
@@ -33,6 +36,7 @@ router.post(
 );
 
 router.get("/get/random", isUserMiddleware, asyncGetPosts);
+
 router.get("/get/posts/user/:id", GetPostsByUserId);
 
 module.exports = router;
