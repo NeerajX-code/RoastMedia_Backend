@@ -14,7 +14,6 @@ const {
   asyncGenerateCaption,
   asyncGetPosts,
   GetPostsByUserId,
-  GetPostsByUserId,
 } = require("../controllers/post.controllers");
 
 const upload = multer({ storage: multer.memoryStorage() });
@@ -36,7 +35,9 @@ router.post(
 );
 
 router.get("/get/random", isUserMiddleware, asyncGetPosts);
-
 router.get("/get/posts/user/:id", GetPostsByUserId);
+
+
+//router
 
 module.exports = router;

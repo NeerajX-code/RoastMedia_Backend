@@ -314,5 +314,5 @@ module.exports = {
   ToggleLikeController,
   asyncGenerateCaption,
   asyncGetPosts,
-  GetPostsByUserId,
+  GetPostsByUserId
 };
