@@ -95,10 +95,13 @@ async function loginController(req, res) {
 
 async function logoutController(req, res) {
   try {
+    const isProduction = process.env.NODE_ENV === "production";
+
     res.clearCookie("token", {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
+      secure: isProduction,
+      sameSite: isProduction ? "none" : "lax",
+      path: "/",
     });
 
     return res.status(200).json({ message: "Logged out successfully" });
