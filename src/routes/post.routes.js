@@ -14,6 +14,8 @@ const {
   asyncGenerateCaption,
   asyncGetPosts,
   GetPostsByUserId,
+  editCommentController,
+  deleteCommentController,
 } = require("../controllers/post.controllers");
 
 const upload = multer({ storage: multer.memoryStorage() });
@@ -21,9 +23,21 @@ console.log(upload);
 
 router.post("/", authMiddleware, upload.single("image"), createPostController);
 
-router.post("/comment", authMiddleware, createCommentController);
+router.post("/comment/:postId", authMiddleware, createCommentController);
+router.get("/comments/:postId", getCommentController);
 
-router.get("/comments", getCommentController);
+router.put(
+  "/comment/:postId/:commentId",
+  authMiddleware,
+  editCommentController
+);
+
+// Delete comment
+router.delete(
+  "/comment/:postId/:commentId",
+  authMiddleware,
+  deleteCommentController
+);
 
 router.patch("/like/:postId", authMiddleware, ToggleLikeController);
 
@@ -36,7 +50,6 @@ router.post(
 
 router.get("/get/random", isUserMiddleware, asyncGetPosts);
 router.get("/get/posts/user/:id", GetPostsByUserId);
-
 
 //router
 

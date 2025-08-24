@@ -6,7 +6,7 @@ const CommentModel = require("../models/comment.model");
 const PostModel = require("../models/post.model");
 const LikeModel = require("../models/like.model");
 const mongoose = require("mongoose");
-const { Types } = require("mongoose");
+const { Types } = mongoose;
 
 async function createPostController(req, res) {
   try {
@@ -22,7 +22,7 @@ async function createPostController(req, res) {
     }
 
     const url = await uploadImage(file.buffer, uuidv4());
-  
+
     const post = await postModel.create({
       user: user._id,
       image: url.url,
@@ -53,7 +53,10 @@ async function createPostController(req, res) {
 
 async function createCommentController(req, res) {
   try {
-    const { comment, postId } = req.body;
+    const { postId } = req.params;
+    const { comment } = req.body;
+
+    console.log(postId, comment);
 
     if (!comment || !postId) {
       return res
@@ -66,24 +69,145 @@ async function createCommentController(req, res) {
       return res.status(404).json({ message: "Post not found." });
     }
 
-    await CommentModel.create({
+    const newComment = await CommentModel.create({
       comment,
       post: postId,
       user: req.user._id,
     });
 
+    const populatedComment = await CommentModel.aggregate([
+      { $match: { _id: new mongoose.Types.ObjectId(newComment._id) } },
+
+      {
+        $lookup: {
+          from: "userprofiles",
+          localField: "user",
+          foreignField: "userId",
+          as: "profile",
+        },
+      },
+
+      { $unwind: { path: "$profile", preserveNullAndEmptyArrays: true } },
+
+      // Select only required fields
+      {
+        $project: {
+          _id: 1,
+          comment: 1,
+          createdAt: 1,
+          user: 1,
+          "profile.avatarUrl": 1,
+          "profile.displayName": 1,
+        },
+      },
+    ]);
+
     return res.status(201).json({
       message: "Comment created successfully.",
+      comment: populatedComment,
     });
   } catch (error) {
     console.error("Error creating comment:", error);
-    return res.status(500).json({ message: "Internal server error" });
+    return res.status(500).json({ message: `${error} Internal server error` });
+  }
+}
+
+async function editCommentController(req, res) {
+  try {
+    const { postId, commentId } = req.params;
+    const { comment } = req.body;
+
+    if (!comment) {
+      return res.status(400).json({ message: "Comment text is required." });
+    }
+
+    // Check if post exists
+    const isPostExist = await PostModel.findById(postId);
+    if (!isPostExist) {
+      return res.status(404).json({ message: "Post not found." });
+    }
+
+    // Find and update comment
+    const newComment = await CommentModel.findOneAndUpdate(
+      { _id: commentId, post: postId, user: req.user._id },
+      { comment: comment },
+      { new: true }
+    );
+
+    if (!newComment) {
+      return res
+        .status(404)
+        .json({ message: "Comment not found or not authorized." });
+    }
+
+    // Populate user profile
+    const populatedComment = await CommentModel.aggregate([
+      { $match: { _id: new mongoose.Types.ObjectId(newComment._id) } },
+      {
+        $lookup: {
+          from: "userprofiles",
+          localField: "user",
+          foreignField: "userId",
+          as: "profile",
+        },
+      },
+      { $unwind: { path: "$profile", preserveNullAndEmptyArrays: true } },
+      {
+        $project: {
+          _id: 1,
+          comment: 1,
+          createdAt: 1,
+          user: 1,
+          "profile.avatarUrl": 1,
+          "profile.displayName": 1,
+        },
+      },
+    ]);
+
+    return res.status(200).json({
+      message: "Comment updated successfully.",
+      comment: populatedComment[0],
+    });
+  } catch (error) {
+    console.error("Error editing comment:", error);
+    return res.status(500).json({ message: `${error} Internal server error` });
+  }
+}
+
+async function deleteCommentController(req, res) {
+  try {
+    const { postId, commentId } = req.params;
+
+    const isPostExist = await postModel.findById(postId);
+    if (!isPostExist) {
+      return res.status(404).json({ message: "Post not found." });
+    }
+
+    const deleted = await CommentModel.findOneAndDelete({
+      _id: commentId,
+      post: postId,
+      user: req.user._id,
+    });
+
+    if (!deleted) {
+      return res
+        .status(404)
+        .json({ message: "Comment not found or not authorized." });
+    }
+
+    return res.status(200).json({
+      message: "Comment deleted successfully.",
+      commentId: commentId,
+    });
+  } catch (error) {
+    console.error("Error deleting comment:", error);
+    return res.status(500).json({ message: `${error} Internal server error` });
   }
 }
 
 async function getCommentController(req, res) {
   try {
-    const { postId } = req.body;
+    const { postId } = req.params;
 
     if (!postId) {
       return res.status(400).json({
@@ -91,9 +215,33 @@ async function getCommentController(req, res) {
       });
     }
 
-    const comments = await CommentModel.find({ post: postId })
-      .populate("user", "username") // sirf required user fields
-      .sort({ createdAt: -1 }); // latest first
+    const comments = await CommentModel.aggregate([
+      { $match: { post: new mongoose.Types.ObjectId(postId) } },
+
+      {
+        $lookup: {
+          from: "userprofiles",
+          localField: "user",
+          foreignField: "userId",
+          as: "profile",
+        },
+      },
+
+      { $unwind: { path: "$profile", preserveNullAndEmptyArrays: true } },
+
+      // Select only required fields
+      {
+        $project: {
+          _id: 1,
+          comment: 1,
+          createdAt: 1,
+          user: 1,
+          "profile.avatarUrl": 1,
+          "profile.displayName": 1,
+        },
+      },
+      { $sort: { createdAt: -1 } },
+    ]);
 
     return res.status(200).json({
       message: "Comments fetched successfully.",
@@ -314,5 +462,7 @@ module.exports = {
   ToggleLikeController,
   asyncGenerateCaption,
   asyncGetPosts,
-  GetPostsByUserId
+  GetPostsByUserId,
+  editCommentController,
+  deleteCommentController,
 };
