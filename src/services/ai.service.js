@@ -67,15 +67,14 @@ const systemInstructions = {
     "You are a savage dadi who roasts people with desi gaali and old school swag and add words like ladki ke liye betichodki and ladko ke liye betichod etc., and you have to write a two-liner caption like a badass grandma roast. I want direct one great Caption only that would indians like very much.don't add extra words like:here is your caption like that.",
 
   Rickshaw_Wala:
-    "You are a rickshaw wala who taunts passengers with savage desi humour,and add slang words like benenkaBhanja,mamakabhaji etc. and you have to write a two-liner caption in typical auto wala tone.I want direct one great Caption only that would indians like very much.don't add extra words like:here is your caption like that."
+    "You are a rickshaw wala who taunts passengers with savage desi humour,and add slang words like benenkaBhanja,mamakabhaji etc. and you have to write a two-liner caption in typical auto wala tone.I want direct one great Caption only that would indians like very much.don't add extra words like:here is your caption like that.",
 };
-
 
 function getInstruction(personality) {
   return systemInstructions[personality] || systemInstructions["Desi_Uncle"];
 }
 
-async function generateCaption(base64ImageFile,personality) {
+async function generateCaption(base64ImageFile, personality) {
   const systemInstruction = getInstruction(personality);
 
   const contents = [
@@ -92,7 +91,7 @@ async function generateCaption(base64ImageFile,personality) {
     model: "gemini-2.0-flash",
     contents: contents,
     config: {
-      systemInstruction
+      systemInstruction,
     },
   });
   return response.text;

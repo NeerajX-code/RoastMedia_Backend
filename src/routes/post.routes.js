@@ -15,15 +15,29 @@ const {
   asyncGetPosts,
   GetPostsByUserId,
   getPostDetailsById,
+  editCommentController,
+  deleteCommentController,
 } = require("../controllers/post.controllers");
 
 const upload = multer({ storage: multer.memoryStorage() });
 
 router.post("/", authMiddleware, upload.single("image"), createPostController);
 
-router.post("/comment", authMiddleware, createCommentController);
+router.post("/comment/:postId", authMiddleware, createCommentController);
+router.get("/comments/:postId", getCommentController);
 
-router.get("/comments", getCommentController);
+router.put(
+  "/comment/:postId/:commentId",
+  authMiddleware,
+  editCommentController
+);
+
+// Delete comment
+router.delete(
+  "/comment/:postId/:commentId",
+  authMiddleware,
+  deleteCommentController
+);
 
 router.patch("/like/:postId", authMiddleware, ToggleLikeController);
 
