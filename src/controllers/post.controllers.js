@@ -676,6 +676,55 @@ async function getSaves(req, res) {
 }
 
 
+async function getPostDetailsById(req, res) {
+  try {
+    const { id } = req.params;
+    console.log(id);
+    
+    // ensure id is valid ObjectId
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "Invalid post id" });
+    }
+
+    const posts = await PostModel.aggregate([
+      { $match: { _id: new mongoose.Types.ObjectId(id) } }, // filter by id
+      {
+        $lookup: {
+          from: "userprofiles", // collection name
+          localField: "user", // field in PostModel
+          foreignField: "userId", // field in UserProfile
+          as: "userData",
+        },
+      },
+      { $unwind: "$userData" },
+
+      {
+        $project: {
+          image: 1,
+          caption: 1,
+          likesCount: 1,
+          commentCount: 1,
+          shareCount: 1,
+          "userData._id": 1,
+          "userData.displayName": 1,
+          "userData.avatarUrl": 1,
+        },
+      },
+    ]);
+
+    console.log(posts);
+    
+
+    if (!posts.length) {
+      return res.status(404).json({ message: "Post not found" });
+    }
+
+    return res.status(200).json(posts[0]);
+  } catch (error) {
+    return res.status(500).json({ message: "Server error" });
+  }
+}
+
 module.exports = {
   createPostController,
   createCommentController,
@@ -684,6 +733,7 @@ module.exports = {
   asyncGenerateCaption,
   asyncGetPosts,
   GetPostsByUserId,
+  getPostDetailsById,
   editCommentController,
   deleteCommentController,
   updateShareCountController,

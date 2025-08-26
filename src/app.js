@@ -25,7 +25,6 @@ app.use(
   })
 );
 
-
 app.use("/api/auth", authRouter);
 app.use("/api/post", postRouter);
 app.use("/api/user", userRouter);

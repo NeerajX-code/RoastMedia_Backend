@@ -135,6 +135,7 @@ async function SearchUsers(req, res) {
 
 async function getUserProfilebyId(req, res) {
   const { id } = req.params;
+  
   try {
     if (!Types.ObjectId.isValid(id)) {
       return res.status(400).json({ message: "Invalid user id" });
