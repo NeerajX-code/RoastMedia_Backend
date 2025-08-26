@@ -16,6 +16,9 @@ const {
   GetPostsByUserId,
   editCommentController,
   deleteCommentController,
+  updateShareCountController,
+  toggleSavePost,
+  getSaves,
 } = require("../controllers/post.controllers");
 
 const upload = multer({ storage: multer.memoryStorage() });
@@ -51,6 +54,9 @@ router.post(
 router.get("/get/random", isUserMiddleware, asyncGetPosts);
 router.get("/get/posts/user/:id", GetPostsByUserId);
 
+router.patch("/:postId/share", authMiddleware, updateShareCountController);
 //router
+router.get("/my-saves/", authMiddleware, getSaves);
+router.post("/save/:postId", authMiddleware, toggleSavePost);
 
 module.exports = router;

@@ -6,6 +6,7 @@ const CommentModel = require("../models/comment.model");
 const PostModel = require("../models/post.model");
 const LikeModel = require("../models/like.model");
 const mongoose = require("mongoose");
+const saveModel = require("../models/save.model");
 const { Types } = mongoose;
 
 async function createPostController(req, res) {
@@ -75,9 +76,14 @@ async function createCommentController(req, res) {
       user: req.user._id,
     });
 
+    const updatedPost = await PostModel.findByIdAndUpdate(
+      postId,
+      { $inc: { commentCount: 1 } },
+      { new: true } // returns updated doc
+    );
+
     const populatedComment = await CommentModel.aggregate([
       { $match: { _id: new mongoose.Types.ObjectId(newComment._id) } },
-
       {
         $lookup: {
           from: "userprofiles",
@@ -105,6 +111,7 @@ async function createCommentController(req, res) {
     return res.status(201).json({
       message: "Comment created successfully.",
       comment: populatedComment,
+      commentCount: updatedPost.commentCount,
     });
   } catch (error) {
     console.error("Error creating comment:", error);
@@ -127,10 +134,9 @@ async function editCommentController(req, res) {
       return res.status(404).json({ message: "Post not found." });
     }
 
-    // Find and update comment
     const newComment = await CommentModel.findOneAndUpdate(
       { _id: commentId, post: postId, user: req.user._id },
-      { comment: comment },
+      { $set: { comment } },
       { new: true }
     );
 
@@ -177,12 +183,7 @@ async function editCommentController(req, res) {
 async function deleteCommentController(req, res) {
   try {
     const { postId, commentId } = req.params;
-
-    const isPostExist = await postModel.findById(postId);
-    if (!isPostExist) {
-      return res.status(404).json({ message: "Post not found." });
-    }
-
+    // Delete comment only if it belongs to the post & user
     const deleted = await CommentModel.findOneAndDelete({
       _id: commentId,
       post: postId,
@@ -190,14 +191,26 @@ async function deleteCommentController(req, res) {
     });
 
     if (!deleted) {
-      return res
-        .status(404)
-        .json({ message: "Comment not found or not authorized." });
+      return res.status(404).json({
+        message: "Comment not found or not authorized.",
+      });
+    }
+
+    let post = await postModel.findByIdAndUpdate(
+      postId,
+      { $inc: { commentCount: -1 } },
+      { new: true }
+    );
+
+    if (post.commentCount < 0) {
+      post.commentCount = 0;
+      await post.save();
     }
 
     return res.status(200).json({
       message: "Comment deleted successfully.",
-      commentId: commentId,
+      commentId,
+      commentCount: post.commentCount,
     });
   } catch (error) {
     console.error("Error deleting comment:", error);
@@ -385,6 +398,7 @@ async function asyncGetPosts(req, res) {
 
     // Step 3: Find which posts the logged-in user liked
     let likedDocs = [];
+    let saveDocs = [];
 
     if (req.user) {
       console.log(req.user);
@@ -400,11 +414,20 @@ async function asyncGetPosts(req, res) {
         post: { $in: postObjectIds }, // correct field name
       }).select("post"); // correct field to select
 
+      saveDocs = await saveModel
+        .find({
+          user: req.user._id,
+          post: { $in: postObjectIds },
+        })
+        .select("post");
+
       console.log("LikedDocs:", likedDocs);
+      console.log("SaveDocs", likedDocs);
     }
 
     // Step 4: Make a Set for fast lookup
     const likedSet = new Set(likedDocs.map((doc) => doc.post?.toString()));
+    const saveSet = new Set(saveDocs.map((doc) => doc.post?.toString()));
 
     console.log(likedSet);
 
@@ -412,6 +435,7 @@ async function asyncGetPosts(req, res) {
     posts = posts.map((p) => ({
       ...p,
       isLiked: likedSet.has(p._id.toString()),
+      saved: saveSet.has(p._id.toString()),
     }));
 
     console.log(posts);
@@ -454,6 +478,203 @@ async function GetPostsByUserId(req, res) {
     });
   }
 }
+async function updateShareCountController(req, res) {
+  try {
+    const { postId } = req.params;
+    console.log(postId);
+
+    const post = await postModel.findByIdAndUpdate(
+      postId,
+      {
+        $inc: { shareCount: 1 },
+      },
+      { new: true }
+    );
+
+    if (!post) {
+      return res.status(404).json({ message: "Post not found." });
+    }
+
+    return res.status(200).json({
+      message: "Post share count incremented successfully.",
+      shareCount: post.shareCount,
+    });
+  } catch (error) {
+    console.error("Error updating share count:", error);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+}
+
+async function toggleSavePost(req, res) {
+  try {
+    const { postId } = req.params;
+    const userId = req.user._id; // middleware se aayega
+
+    // Check if post exists
+    const post = await PostModel.findById(postId);
+    if (!post) {
+      return res.status(404).json({ message: "Post not found." });
+    }
+
+    // Check if already saved
+    const existingSave = await saveModel.findOne({
+      post: postId,
+      user: userId,
+    });
+
+    if (existingSave) {
+      // 🗑️ Unsaving post
+      await saveModel.findByIdAndDelete(existingSave._id);
+
+      return res.status(200).json({
+        message: "Post unsaved",
+        saved: false,
+      });
+    }
+
+    const newSaved = await saveModel.create({ post: postId, user: userId });
+
+    let savedPost = await saveModel.aggregate([
+      { $match: { post: newSaved.post, user: newSaved.user } },
+
+      // Join posts
+      {
+        $lookup: {
+          from: "posts",
+          localField: "post",
+          foreignField: "_id",
+          as: "post",
+        },
+      },
+      { $unwind: "$post" },
+
+      // Join user
+      {
+        $lookup: {
+          from: "users",
+          localField: "post.user",
+          foreignField: "_id",
+          as: "userData",
+        },
+      },
+      { $unwind: "$userData" },
+
+      // Join userProfile
+      {
+        $lookup: {
+          from: "userprofiles",
+          localField: "post.user",
+          foreignField: "userId",
+          as: "userProfile",
+        },
+      },
+      { $unwind: "$userProfile" },
+      {
+        $project: {
+          "post.userData.username": 1,
+        },
+      },
+    ]);
+    return res
+      .status(201)
+      .json({ message: "Post saved", saved: true, save: savedPost });
+
+  } catch (error) {
+    console.error("Save Toggle Error:", error);
+    return res.status(500).json({
+      message: "Error toggling save",
+      error: error.message,
+    });
+  }
+}
+
+async function getSaves(req, res) {
+  try {
+    const userId = req.user._id;
+
+    let savedPosts = await saveModel.aggregate([
+      { $match: { user: new mongoose.Types.ObjectId(userId) } },
+
+      // Join posts
+      {
+        $lookup: {
+          from: "posts",
+          localField: "post",
+          foreignField: "_id",
+          as: "post",
+        },
+      },
+      { $unwind: "$post" },
+
+      // Join user
+      {
+        $lookup: {
+          from: "users",
+          localField: "post.user",
+          foreignField: "_id",
+          as: "userData",
+        },
+      },
+      { $unwind: "$userData" },
+
+      // Join userProfile
+      {
+        $lookup: {
+          from: "userprofiles",
+          localField: "post.user",
+          foreignField: "userId",
+          as: "userProfile",
+        },
+      },
+      { $unwind: "$userProfile" },
+
+      // Keep only needed fields
+      {
+        $project: {
+          _id: 1,
+          "post._id": 1,
+          "post.caption": 1,
+          "post.image": 1,
+          "post.createdAt": 1,
+          "userData.username": 1,
+          "userProfile.displayName": 1,
+          "userProfile.avatarUrl": 1,
+        },
+      },
+    ]);
+
+    // Collect postIds
+    const postIds = savedPosts.map((p) => p.post._id);
+    const postObjectIds = postIds.map((id) => new mongoose.Types.ObjectId(id));
+
+    // Find likes by current user for these posts
+    const likedDocs = await LikeModel.find({
+      user: req.user._id,
+      post: { $in: postObjectIds },
+    }).select("post");
+
+    const likedSet = new Set(likedDocs.map((doc) => doc.post.toString()));
+
+    // Add flags
+    savedPosts = savedPosts.map((p) => ({
+      ...p,
+      isLiked: likedSet.has(p.post._id.toString()),
+      saved: true,
+    }));
+
+    return res.status(200).json({
+      message: "Saved Post Fetch Successfully.",
+      count: savedPosts.length,
+      savedPosts,
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "Error fetching saved posts",
+      error: error.message,
+    });
+  }
+}
+
 
 module.exports = {
   createPostController,
@@ -465,4 +686,7 @@ module.exports = {
   GetPostsByUserId,
   editCommentController,
   deleteCommentController,
+  updateShareCountController,
+  toggleSavePost,
+  getSaves,
 };
