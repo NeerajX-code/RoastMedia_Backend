@@ -394,8 +394,6 @@ async function asyncGetPosts(req, res) {
 
     const postIds = posts.map((p) => p._id);
 
-    console.log(postIds);
-
     // Step 3: Find which posts the logged-in user liked
     let likedDocs = [];
     let saveDocs = [];
@@ -406,8 +404,6 @@ async function asyncGetPosts(req, res) {
       const postObjectIds = postIds.map(
         (id) => new mongoose.Types.ObjectId(id)
       );
-
-      console.log("postObjectIds", postObjectIds);
 
       likedDocs = await LikeModel.find({
         user: req.user._id, // correct field name
@@ -420,16 +416,11 @@ async function asyncGetPosts(req, res) {
           post: { $in: postObjectIds },
         })
         .select("post");
-
-      console.log("LikedDocs:", likedDocs);
-      console.log("SaveDocs", likedDocs);
     }
 
     // Step 4: Make a Set for fast lookup
     const likedSet = new Set(likedDocs.map((doc) => doc.post?.toString()));
     const saveSet = new Set(saveDocs.map((doc) => doc.post?.toString()));
-
-    console.log(likedSet);
 
     // Step 5: Inject isLiked into posts
     posts = posts.map((p) => ({
@@ -437,8 +428,6 @@ async function asyncGetPosts(req, res) {
       isLiked: likedSet.has(p._id.toString()),
       saved: saveSet.has(p._id.toString()),
     }));
-
-    console.log(posts);
 
     return res.status(200).json({
       success: true,
@@ -571,14 +560,25 @@ async function toggleSavePost(req, res) {
       { $unwind: "$userProfile" },
       {
         $project: {
-          "post.userData.username": 1,
+          _id: 1,
+          "post._id": 1,
+          "post.caption": 1,
+          "post.image": 1,
+          "post.likesCount": 1,
+          "post.commentCount": 1,
+          "post.shareCount": 1,
+          "post.createdAt": 1,
+          "userData.username": 1,
+          "userProfile.displayName": 1,
+          "userProfile.avatarUrl": 1,
         },
       },
     ]);
+
+    console.log(savedPost);
     return res
       .status(201)
       .json({ message: "Post saved", saved: true, save: savedPost });
-
   } catch (error) {
     console.error("Save Toggle Error:", error);
     return res.status(500).json({
@@ -635,6 +635,9 @@ async function getSaves(req, res) {
           "post._id": 1,
           "post.caption": 1,
           "post.image": 1,
+          "post.likesCount": 1,
+          "post.commentCount": 1,
+          "post.shareCount": 1,
           "post.createdAt": 1,
           "userData.username": 1,
           "userProfile.displayName": 1,
@@ -675,12 +678,11 @@ async function getSaves(req, res) {
   }
 }
 
-
 async function getPostDetailsById(req, res) {
   try {
     const { id } = req.params;
     console.log(id);
-    
+
     // ensure id is valid ObjectId
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).json({ message: "Invalid post id" });
@@ -713,7 +715,6 @@ async function getPostDetailsById(req, res) {
     ]);
 
     console.log(posts);
-    
 
     if (!posts.length) {
       return res.status(404).json({ message: "Post not found" });

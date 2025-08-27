@@ -55,4 +55,8 @@ router.get("/get/random", isUserMiddleware, asyncGetPosts);
 router.get("/get/posts/user/:id", GetPostsByUserId);
 router.get("/get/single-post/:id", getPostDetailsById);
 
+router.patch("/:postId/share/", updateShareCountController);
+router.post("/save/:postId", authMiddleware, toggleSavePost);
+router.get("/my-saves", authMiddleware, getSaves);
+
 module.exports = router;
