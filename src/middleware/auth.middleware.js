@@ -1,6 +1,5 @@
 const UserModel = require("../models//user.model");
 const jwt = require("jsonwebtoken");
-const bcrypt = require("bcryptjs");
 
 async function authMiddleware(req, res, next) {
   const { token } = req.cookies;
