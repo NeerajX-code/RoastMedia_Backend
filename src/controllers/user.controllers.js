@@ -86,7 +86,7 @@ async function SearchUsers(req, res) {
   if (!query) return res.status(200).json([]);
 
   try {
-    const users = await UserProfileModel.aggregate([
+  const users = await UserProfileModel.aggregate([
       {
         $lookup: {
           from: "users", // join with User collection
