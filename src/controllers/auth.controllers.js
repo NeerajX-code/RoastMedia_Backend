@@ -27,7 +27,7 @@ async function registerController(req, res) {
     });
 
     // Create JWT token
-    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET);
+  const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '7d', algorithm: 'HS256' });
 
     // Create user profile with defaults
     await UserProfileModel.create({
@@ -39,6 +39,7 @@ async function registerController(req, res) {
       httpOnly: true,
       secure: !!isHttps,
       sameSite: isHttps ? "none" : "lax",
+      path: "/",
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
@@ -63,7 +64,7 @@ async function loginController(req, res) {
     $or: [{ username: identifier }, { email: identifier }],
   });
 
-  console.log(user);
+  // Do not log user object in production
 
   if (!user) {
     return res.status(404).json({ message: "User not found" });
@@ -75,13 +76,14 @@ async function loginController(req, res) {
     return res.status(401).json({ message: "Invalid password" });
   }
 
-  const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET);
+  const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '7d', algorithm: 'HS256' });
 
   const isHttps = req.secure || req.headers["x-forwarded-proto"] === "https" || process.env.NODE_ENV === "production";
   res.cookie("token", token, {
     httpOnly: true,
     secure: !!isHttps,
     sameSite: isHttps ? "none" : "lax",
+    path: "/",
     maxAge: 7 * 24 * 60 * 60 * 1000,
   });
 

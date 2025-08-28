@@ -4,6 +4,7 @@ const Message = require("../models/message.model");
 
 // in-memory userId -> socketId map
 const onlineUsers = new Map();
+// Calls removed: no active call tracking
 
 function authSocket(handshake) {
   try {
@@ -56,7 +57,31 @@ function setupSocket(io) {
     onlineUsers.set(userId, socket.id);
     socket.join(userId); // room per user id
 
-    socket.on("chat:send", async ({ to, text, mediaUrl, mediaType }) => {
+    // On connect: mark any messages to me as delivered and notify senders for double ticks
+    (async () => {
+      try {
+        const undelivered = await Message.find({ receiver: userId, deliveredAt: null })
+          .select("_id sender conversation")
+          .lean();
+        if (!undelivered.length) return;
+        const deliveredAt = new Date();
+        await Message.updateMany({ _id: { $in: undelivered.map((m) => m._id) } }, { $set: { deliveredAt } });
+        // group by sender+conversation so sender clients can update per-thread
+        const groups = new Map();
+        for (const m of undelivered) {
+          const key = `${String(m.sender)}:${String(m.conversation)}`;
+          if (!groups.has(key)) groups.set(key, { sender: String(m.sender), conversationId: String(m.conversation), ids: [] });
+          groups.get(key).ids.push(String(m._id));
+        }
+        for (const { sender, conversationId, ids } of groups.values()) {
+          io.to(sender).emit("chat:delivered", { conversationId, messageIds: ids, deliveredAt });
+        }
+      } catch (e) {
+        console.warn("[socket] deliver-on-connect failed", e);
+      }
+    })();
+
+  socket.on("chat:send", async ({ to, text, mediaUrl, mediaType }) => {
       if (!to || (!text && !mediaUrl)) return;
       const convo = await getOrCreateConversation(userId, to);
       const msg = await Message.create({
@@ -72,7 +97,7 @@ function setupSocket(io) {
       convo.lastMessageAt = new Date();
       await convo.save();
 
-      // echo to sender immediately with sent state (no deliveredAt)
+  // echo to sender immediately with sent state (no deliveredAt)
       socket.emit("chat:message", {
         _id: msg._id,
         conversation: convo._id,
@@ -108,7 +133,7 @@ function setupSocket(io) {
       }
     });
 
-    socket.on("chat:seen", async ({ conversationId, messageIds }) => {
+  socket.on("chat:seen", async ({ conversationId, messageIds }) => {
       if (!conversationId || !messageIds?.length) return;
   await Message.updateMany(
         { _id: { $in: messageIds }, receiver: userId, conversation: conversationId },
@@ -124,9 +149,33 @@ function setupSocket(io) {
       } catch {}
     });
 
+    // When a user opens a conversation, mark any pending messages as delivered and notify the other side
+    socket.on("chat:open", async ({ conversationId }) => {
+      try {
+        if (!conversationId) return;
+        const convo = await Conversation.findById(conversationId).lean();
+        if (!convo) return;
+        const isParticipant = convo.participants.some((p) => String(p) === String(userId));
+        if (!isParticipant) return;
+        const deliveredAt = new Date();
+        const pending = await Message.find({ conversation: conversationId, receiver: userId, deliveredAt: null })
+          .select("_id")
+          .lean();
+        if (!pending.length) return;
+        await Message.updateMany({ _id: { $in: pending.map((m) => m._id) } }, { $set: { deliveredAt } });
+        const other = String(convo.participants.find((p) => String(p) !== String(userId)) || "");
+        if (other) io.to(other).emit("chat:delivered", { conversationId: String(conversationId), messageIds: pending.map((m) => String(m._id)), deliveredAt });
+      } catch (e) {
+        console.warn("[socket] chat:open failed", e);
+      }
+    });
+
+  // Chat-only: no jitsi:* or sp:* signaling
+
     socket.on("disconnect", (reason) => {
       console.log("[socket] disconnected", { userId: String(userId), reason });
       onlineUsers.delete(userId);
+  // Chat-only: no pending invites to clean
     });
   });
 }

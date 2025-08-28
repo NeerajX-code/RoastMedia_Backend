@@ -13,6 +13,7 @@ const allowedOrigins = [
   "http://localhost:5173",
   "https://roastmedia-frontend.onrender.com",
   "https://kj5qc8fs-5173.inc1.devtunnels.ms",
+  "https://z45l08wm-5173.inc1.devtunnels.ms"
 ];
 
 const io = new Server(server, {
