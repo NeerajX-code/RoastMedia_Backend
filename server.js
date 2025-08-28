@@ -1,8 +1,32 @@
 const app = require("./src/app");
 const connectDB = require("./src/db/db");
+const http = require("http");
+const { Server } = require("socket.io");
+const { setupSocket } = require("./src/socket/socket");
 
 connectDB();
 
-app.listen(3000, () => {
-  console.log("Server is running on port 3000");
+const server = http.createServer(app);
+
+// create socket.io server with same CORS policy as app
+const allowedOrigins = [
+  "http://localhost:5173",
+  "https://roastmedia-frontend.onrender.com",
+  "https://kj5qc8fs-5173.inc1.devtunnels.ms",
+];
+
+const io = new Server(server, {
+  cors: {
+    origin: allowedOrigins,
+    credentials: true,
+  },
 });
+
+setupSocket(io);
+
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => {
+  console.log(`Server is running on port ${PORT}`);
+});
+
+module.exports = { io };
