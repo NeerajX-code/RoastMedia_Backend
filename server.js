@@ -20,6 +20,10 @@ const io = new Server(server, {
     origin: allowedOrigins,
     credentials: true,
   },
+  path: "/socket.io",
+  allowEIO3: false,
+  pingTimeout: 25000,
+  pingInterval: 20000,
 });
 
 setupSocket(io);

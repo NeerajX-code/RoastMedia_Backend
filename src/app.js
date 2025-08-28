@@ -12,6 +12,8 @@ const app = express();
 
 app.use(express.json());
 app.use(cookieParser());
+// Behind Render/NGINX proxy so that req.secure and cookies work correctly
+app.set("trust proxy", 1);
 
 const allowedOrigins = [
   "http://localhost:5173",
