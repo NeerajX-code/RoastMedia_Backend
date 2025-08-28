@@ -44,10 +44,15 @@ function setupSocket(io) {
   io.on("connection", (socket) => {
     const userId = authSocket(socket.handshake);
     if (!userId) {
+      console.warn("[socket] auth failed: missing/invalid token; headers:", {
+        origin: socket.handshake.headers?.origin,
+        referer: socket.handshake.headers?.referer,
+      });
       socket.disconnect(true);
       return;
     }
 
+    console.log("[socket] connected", { userId: String(userId), transport: socket.conn.transport.name });
     onlineUsers.set(userId, socket.id);
     socket.join(userId); // room per user id
 
@@ -119,7 +124,8 @@ function setupSocket(io) {
       } catch {}
     });
 
-    socket.on("disconnect", () => {
+    socket.on("disconnect", (reason) => {
+      console.log("[socket] disconnected", { userId: String(userId), reason });
       onlineUsers.delete(userId);
     });
   });

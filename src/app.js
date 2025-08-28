@@ -15,11 +15,15 @@ app.use(cookieParser());
 // Behind Render/NGINX proxy so that req.secure and cookies work correctly
 app.set("trust proxy", 1);
 
-const allowedOrigins = [
-  "http://localhost:5173",
-  "https://roastmedia-frontend.onrender.com",
-  "https://kj5qc8fs-5173.inc1.devtunnels.ms",
-];
+const allowedOrigins = (
+  process.env.FRONTEND_ORIGINS
+    ? process.env.FRONTEND_ORIGINS.split(",").map((s) => s.trim()).filter(Boolean)
+    : [
+        "http://localhost:5173",
+        "https://roastmedia-frontend.onrender.com",
+        "https://kj5qc8fs-5173.inc1.devtunnels.ms",
+      ]
+);
 
 app.use(
   cors({

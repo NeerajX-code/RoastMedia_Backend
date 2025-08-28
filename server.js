@@ -9,11 +9,15 @@ connectDB();
 const server = http.createServer(app);
 
 // create socket.io server with same CORS policy as app
-const allowedOrigins = [
-  "http://localhost:5173",
-  "https://roastmedia-frontend.onrender.com",
-  "https://kj5qc8fs-5173.inc1.devtunnels.ms",
-];
+const allowedOrigins = (
+  process.env.FRONTEND_ORIGINS
+    ? process.env.FRONTEND_ORIGINS.split(",").map((s) => s.trim()).filter(Boolean)
+    : [
+        "http://localhost:5173",
+        "https://roastmedia-frontend.onrender.com",
+        "https://kj5qc8fs-5173.inc1.devtunnels.ms",
+      ]
+);
 
 const io = new Server(server, {
   cors: {
