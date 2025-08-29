@@ -708,7 +708,7 @@ async function getPostDetailsById(req, res) {
           likesCount: 1,
           commentCount: 1,
           shareCount: 1,
-          "userData._id": 1,
+          "userData.userId": 1,
           "userData.displayName": 1,
           "userData.avatarUrl": 1,
         },
