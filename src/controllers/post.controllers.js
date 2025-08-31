@@ -52,6 +52,38 @@ async function createPostController(req, res) {
   }
 }
 
+async function deletePostController(req, res) {
+  const { id } = req.params;
+  console.log(id);
+
+  const objId = new mongoose.Types.ObjectId(id);
+  const post = await postModel.findOneAndDelete({
+    _id: objId,
+  });
+
+  if (!post) {
+    return res.status(404).json({
+      message: "post not found",
+    });
+  }
+
+  await LikeModel.deleteMany({
+    post: objId,
+  });
+
+  await CommentModel.deleteMany({
+    post: objId,
+  });
+
+  await saveModel.deleteMany({
+    post: objId,
+  });
+
+  res.status(200).json({
+    message: "Post deleted successfully.",
+  });
+}
+
 async function createCommentController(req, res) {
   try {
     const { postId } = req.params;
@@ -467,6 +499,7 @@ async function GetPostsByUserId(req, res) {
     });
   }
 }
+
 async function updateShareCountController(req, res) {
   try {
     const { postId } = req.params;
@@ -523,63 +556,63 @@ async function toggleSavePost(req, res) {
 
     const newSaved = await saveModel.create({ post: postId, user: userId });
 
-      let savedPost = await saveModel.aggregate([
+    let savedPost = await saveModel.aggregate([
       { $match: { post: newSaved.post, user: newSaved.user } },
-        // Join posts
-        {
-          $lookup: {
-            from: "posts",
-            localField: "post",
-            foreignField: "_id",
-            as: "post",
-          },
+      // Join posts
+      {
+        $lookup: {
+          from: "posts",
+          localField: "post",
+          foreignField: "_id",
+          as: "post",
         },
-        { $unwind: "$post" },
-        // Join user
-        {
-          $lookup: {
-            from: "users",
-            localField: "post.user",
-            foreignField: "_id",
-            as: "userData",
-          },
+      },
+      { $unwind: "$post" },
+      // Join user
+      {
+        $lookup: {
+          from: "users",
+          localField: "post.user",
+          foreignField: "_id",
+          as: "userData",
         },
-        { $unwind: "$userData" },
-        // Join userProfile
-        {
-          $lookup: {
-            from: "userprofiles",
-            localField: "post.user",
-            foreignField: "userId",
-            as: "userProfile",
-          },
+      },
+      { $unwind: "$userData" },
+      // Join userProfile
+      {
+        $lookup: {
+          from: "userprofiles",
+          localField: "post.user",
+          foreignField: "userId",
+          as: "userProfile",
         },
-        { $unwind: "$userProfile" },
-        {
-          $project: {
-            _id: 1,
-            "post._id": 1,
-            "post.caption": 1,
-            "post.image": 1,
-            "post.likesCount": 1,
-            "post.commentCount": 1,
-            "post.shareCount": 1,
-            "post.createdAt": 1,
-            "userData.username": 1,
-            "userProfile.displayName": 1,
-            "userProfile.avatarUrl": 1,
-          },
+      },
+      { $unwind: "$userProfile" },
+      {
+        $project: {
+          _id: 1,
+          "post._id": 1,
+          "post.caption": 1,
+          "post.image": 1,
+          "post.likesCount": 1,
+          "post.commentCount": 1,
+          "post.shareCount": 1,
+          "post.createdAt": 1,
+          "userData.username": 1,
+          "userProfile.displayName": 1,
+          "userProfile.avatarUrl": 1,
         },
-      ]);
-      // Determine if current user has liked this post to include isLiked for client UI
-      const liked = await LikeModel.exists({ user: userId, post: postId });
-      if (savedPost[0]) {
-        savedPost[0].isLiked = !!liked;
-      }
-      console.log(savedPost);
-      return res
-        .status(201)
-        .json({ message: "Post saved", saved: true, save: savedPost });
+      },
+    ]);
+    // Determine if current user has liked this post to include isLiked for client UI
+    const liked = await LikeModel.exists({ user: userId, post: postId });
+    if (savedPost[0]) {
+      savedPost[0].isLiked = !!liked;
+    }
+    console.log(savedPost);
+    return res
+      .status(201)
+      .json({ message: "Post saved", saved: true, save: savedPost });
   } catch (error) {
     console.error("Save Toggle Error:", error);
     return res.status(500).json({
@@ -682,14 +715,12 @@ async function getSaves(req, res) {
 async function getPostDetailsById(req, res) {
   try {
     const { id } = req.params;
-    console.log(id);
 
-    // ensure id is valid ObjectId
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).json({ message: "Invalid post id" });
     }
 
-    const posts = await PostModel.aggregate([
+    const post = await PostModel.aggregate([
       { $match: { _id: new mongoose.Types.ObjectId(id) } }, // filter by id
       {
         $lookup: {
@@ -715,13 +746,38 @@ async function getPostDetailsById(req, res) {
       },
     ]);
 
-    console.log(posts);
-
-    if (!posts.length) {
+    if (!post.length) {
       return res.status(404).json({ message: "Post not found" });
     }
 
-    return res.status(200).json(posts[0]);
+    let isLiked = false;
+    let isSaved = false;
+
+    if (req.user) {
+      try {
+        const like = await LikeModel.findOne({
+          post: id,
+          user: req.user._id,
+        });
+
+        isLiked = !!like;
+
+        const save = await saveModel.findOne({
+          post: id,
+          user: req.user._id,
+        });
+
+        isSaved = !!save;
+
+      } catch (error) {
+        console.log(error);
+      }
+    }
+
+    return res.status(200).json({
+      post: { ...post[0], isLiked , isSaved},
+
+    });
   } catch (error) {
     return res.status(500).json({ message: "Server error" });
   }
@@ -729,6 +785,7 @@ async function getPostDetailsById(req, res) {
 
 module.exports = {
   createPostController,
+  deletePostController,
   createCommentController,
   getCommentController,
   ToggleLikeController,
