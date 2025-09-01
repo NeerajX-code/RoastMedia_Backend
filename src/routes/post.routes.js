@@ -20,6 +20,7 @@ const {
   updateShareCountController,
   toggleSavePost,
   getSaves,
+  deletePostController,
 } = require("../controllers/post.controllers");
 
 const upload = multer({ storage: multer.memoryStorage() });
@@ -35,7 +36,6 @@ router.put(
   editCommentController
 );
 
-// Delete comment
 router.delete(
   "/comment/:postId/:commentId",
   authMiddleware,
@@ -52,11 +52,17 @@ router.post(
 );
 
 router.get("/get/random", isUserMiddleware, asyncGetPosts);
+
 router.get("/get/posts/user/:id", GetPostsByUserId);
-router.get("/get/single-post/:id", getPostDetailsById);
+
+router.get("/get/single-post/:id",isUserMiddleware, getPostDetailsById);
+
+router.delete('/delete-post/:id', deletePostController)
 
 router.patch("/:postId/share/", updateShareCountController);
+
 router.post("/save/:postId", authMiddleware, toggleSavePost);
+
 router.get("/my-saves", authMiddleware, getSaves);
 
 module.exports = router;

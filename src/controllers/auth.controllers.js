@@ -27,14 +27,18 @@ async function registerController(req, res) {
     });
 
     // Create JWT token
-  const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '7d', algorithm: 'HS256' });
+    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
+      expiresIn: "7d",
+    });
 
     // Create user profile with defaults
     await UserProfileModel.create({
       userId: user._id,
     });
 
-    const isHttps = req.secure || req.headers["x-forwarded-proto"] === "https" || process.env.NODE_ENV === "production";
+    const isHttps =
+      req.secure || req.headers["x-forwarded-proto"] === "https" || process.env.NODE_ENV === "production";
+
     res.cookie("token", token, {
       httpOnly: true,
       secure: !!isHttps,
@@ -76,9 +80,15 @@ async function loginController(req, res) {
     return res.status(401).json({ message: "Invalid password" });
   }
 
-  const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '7d', algorithm: 'HS256' });
+  const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
+    expiresIn: "7d",
+    algorithm: "HS256",
+  });
 
-  const isHttps = req.secure || req.headers["x-forwarded-proto"] === "https" || process.env.NODE_ENV === "production";
+  const isHttps =
+    req.secure ||
+    req.headers["x-forwarded-proto"] === "https" ||
+    process.env.NODE_ENV === "production";
   res.cookie("token", token, {
     httpOnly: true,
     secure: !!isHttps,
@@ -95,7 +105,10 @@ async function loginController(req, res) {
 
 async function logoutController(req, res) {
   try {
-    const isHttps = req.secure || req.headers["x-forwarded-proto"] === "https" || process.env.NODE_ENV === "production";
+    const isHttps =
+      req.secure ||
+      req.headers["x-forwarded-proto"] === "https" ||
+      process.env.NODE_ENV === "production";
     res.clearCookie("token", {
       httpOnly: true,
       secure: !!isHttps,
