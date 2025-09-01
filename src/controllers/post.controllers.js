@@ -5,6 +5,7 @@ const { v4: uuidv4 } = require("uuid");
 const CommentModel = require("../models/comment.model");
 const PostModel = require("../models/post.model");
 const LikeModel = require("../models/like.model");
+const NotificationModel = require("../models/notification.model");
 const mongoose = require("mongoose");
 const saveModel = require("../models/save.model");
 const { Types } = mongoose;
@@ -53,35 +54,35 @@ async function createPostController(req, res) {
 }
 
 async function deletePostController(req, res) {
-  const { id } = req.params;
-  console.log(id);
+  try {
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "Invalid post id" });
+    }
 
-  const objId = new mongoose.Types.ObjectId(id);
-  const post = await postModel.findOneAndDelete({
-    _id: objId,
-  });
+    const objId = new mongoose.Types.ObjectId(id);
 
-  if (!post) {
-    return res.status(404).json({
-      message: "post not found",
-    });
+    // Ensure the post exists and belongs to the requesting user
+    const post = await postModel.findOne({ _id: objId });
+    if (!post) {
+      return res.status(404).json({ message: "Post not found" });
+    }
+
+    if (!req.user || post.user.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ message: "Not authorized to delete this post" });
+    }
+
+    // Delete post and related data
+    await postModel.deleteOne({ _id: objId });
+    await LikeModel.deleteMany({ post: objId });
+    await CommentModel.deleteMany({ post: objId });
+    await saveModel.deleteMany({ post: objId });
+
+    return res.status(200).json({ message: "Post deleted successfully." });
+  } catch (error) {
+    console.error("Error deleting post:", error);
+    return res.status(500).json({ message: "Internal server error" });
   }
-
-  await LikeModel.deleteMany({
-    post: objId,
-  });
-
-  await CommentModel.deleteMany({
-    post: objId,
-  });
-
-  await saveModel.deleteMany({
-    post: objId,
-  });
-
-  res.status(200).json({
-    message: "Post deleted successfully.",
-  });
 }
 
 async function createCommentController(req, res) {
@@ -102,7 +103,7 @@ async function createCommentController(req, res) {
       return res.status(404).json({ message: "Post not found." });
     }
 
-    const newComment = await CommentModel.create({
+  const newComment = await CommentModel.create({
       comment,
       post: postId,
       user: req.user._id,
@@ -113,6 +114,19 @@ async function createCommentController(req, res) {
       { $inc: { commentCount: 1 } },
       { new: true } // returns updated doc
     );
+
+    // Create notification for post owner (if not commenting on own post)
+    try {
+      if (isPostExist.user.toString() !== req.user._id.toString()) {
+        await NotificationModel.create({
+          recipient: isPostExist.user,
+          actor: req.user._id,
+          post: postId,
+          type: "comment",
+          comment: newComment._id,
+        });
+      }
+    } catch (e) { console.log("notify-comment", e?.message); }
 
     const populatedComment = await CommentModel.aggregate([
       { $match: { _id: new mongoose.Types.ObjectId(newComment._id) } },
@@ -318,7 +332,7 @@ async function ToggleLikeController(req, res) {
       user: req.user._id,
     });
 
-    if (existingLike) {
+  if (existingLike) {
       // 👉 Unlike
       await existingLike.deleteOne();
       post.likesCount = Math.max(0, post.likesCount - 1);
@@ -339,6 +353,18 @@ async function ToggleLikeController(req, res) {
 
     post.likesCount += 1;
     await post.save();
+
+    // Create notification for post owner (if not liking own post)
+    try {
+      if (post.user.toString() !== req.user._id.toString()) {
+        await NotificationModel.create({
+          recipient: post.user,
+          actor: req.user._id,
+          post: postId,
+          type: "like",
+        });
+      }
+    } catch (e) { console.log("notify-like", e?.message); }
 
     return res.status(201).json({
       message: "Like added successfully.",
