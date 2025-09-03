@@ -115,17 +115,17 @@ async function createCommentController(req, res) {
       { new: true } // returns updated doc
     );
 
-    // Create notification for post owner (if not commenting on own post)
+    // Create notification for post owner; if self-action, mark as read so it won't show as unread
     try {
-      if (isPostExist.user.toString() !== req.user._id.toString()) {
-        await NotificationModel.create({
-          recipient: isPostExist.user,
-          actor: req.user._id,
-          post: postId,
-          type: "comment",
-          comment: newComment._id,
-        });
-      }
+      const isSelf = isPostExist.user.toString() === req.user._id.toString();
+      await NotificationModel.create({
+        recipient: isPostExist.user,
+        actor: req.user._id,
+        post: postId,
+        type: "comment",
+        comment: newComment._id,
+        read: isSelf,
+      });
     } catch (e) { console.log("notify-comment", e?.message); }
 
     const populatedComment = await CommentModel.aggregate([
@@ -354,16 +354,16 @@ async function ToggleLikeController(req, res) {
     post.likesCount += 1;
     await post.save();
 
-    // Create notification for post owner (if not liking own post)
+    // Create notification for post owner; if self-action, mark as read so it won't show as unread
     try {
-      if (post.user.toString() !== req.user._id.toString()) {
-        await NotificationModel.create({
-          recipient: post.user,
-          actor: req.user._id,
-          post: postId,
-          type: "like",
-        });
-      }
+      const isSelf = post.user.toString() === req.user._id.toString();
+      await NotificationModel.create({
+        recipient: post.user,
+        actor: req.user._id,
+        post: postId,
+        type: "like",
+        read: isSelf,
+      });
     } catch (e) { console.log("notify-like", e?.message); }
 
     return res.status(201).json({
