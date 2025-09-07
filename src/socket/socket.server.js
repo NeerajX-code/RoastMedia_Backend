@@ -11,7 +11,10 @@ const onlineUsers = new Map(); // userId -> Set of socketIds
 async function initSocketServer(httpServer) {
   const io = new Server(httpServer, {
     cors: {
-      origin: "http://localhost:5173",
+      origin: [
+        "http://localhost:5173",
+        "https://roastmedia-frontend.onrender.com/",
+      ],
       credentials: true,
     },
   });
@@ -100,21 +103,23 @@ async function initSocketServer(httpServer) {
         console.log(`📂 ${userId} joined conversation ${conversation._id}`);
 
         // ================== SEND MESSAGE ==================
-    socket.on("sendMessage", async ({ text , media }) => {
+        socket.on("sendMessage", async ({ text, media }) => {
           if (!text && !media) return;
 
-          console.log(`✉️ Message from ${userId} to ${otherId}: ${text || "[media]"}`);
+          console.log(
+            `✉️ Message from ${userId} to ${otherId}: ${text || "[media]"}`
+          );
 
           let mediaUrl;
           if (media) {
-      mediaUrl = await uploadImage(media, `message_${Date.now()}`);
+            mediaUrl = await uploadImage(media, `message_${Date.now()}`);
           }
 
           const isUserOnline = onlineUsers.has(otherId);
 
           const newMessage = await messageModel.create({
-      // If media present, treat as "image" for now (extend later for other types)
-      type: media ? "image" : "text",
+            // If media present, treat as "image" for now (extend later for other types)
+            type: media ? "image" : "text",
             sender: userId,
             receiver: otherId,
             conversationId: conversation._id,
@@ -145,7 +150,9 @@ async function initSocketServer(httpServer) {
             createdAt: newMessage.createdAt,
             updatedAt: newMessage.updatedAt,
           };
-          console.log(`Emitting newMessage to conversation ${conversation._id}`);
+          console.log(
+            `Emitting newMessage to conversation ${conversation._id}`
+          );
           io.to(conversation._id.toString()).emit("newMessage", msgPayload);
         });
 
