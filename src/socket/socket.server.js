@@ -60,8 +60,9 @@ async function initSocketServer(httpServer) {
     });
 
     // 📩 Update "sent" → "delivered" for all pending messages
+    // Mark any pending messages to this user as delivered
     await messageModel.updateMany(
-      { receiverId: userId, status: "sent" },
+      { receiver: userId, status: "sent" },
       { $set: { status: "delivered" } }
     );
 
@@ -99,27 +100,30 @@ async function initSocketServer(httpServer) {
         console.log(`📂 ${userId} joined conversation ${conversation._id}`);
 
         // ================== SEND MESSAGE ==================
-        socket.on("sendMessage", async ({ text, media }) => {
+    socket.on("sendMessage", async ({ text , media }) => {
           if (!text && !media) return;
+
+          console.log(`✉️ Message from ${userId} to ${otherId}: ${text || "[media]"}`);
 
           let mediaUrl;
           if (media) {
-            mediaUrl = await uploadImage(media, `message_${Date.now()}`);
+      mediaUrl = await uploadImage(media, `message_${Date.now()}`);
           }
 
           const isUserOnline = onlineUsers.has(otherId);
 
           const newMessage = await messageModel.create({
+      // If media present, treat as "image" for now (extend later for other types)
+      type: media ? "image" : "text",
+            sender: userId,
+            receiver: otherId,
             conversationId: conversation._id,
-            senderId: userId,
-            receiverId: otherId,
             ...(text && { content: text }),
             ...(media && { mediaUrl: mediaUrl.url, fileId: mediaUrl.fileId }),
             status: isUserOnline ? "delivered" : "sent",
           });
 
-          conversation.lastMessage =
-            text || (media ? "📎 Media" : ""); // lastMessage update
+          conversation.lastMessage = text || (media ? "📎 Media" : ""); // lastMessage update
           if (!isUserOnline) {
             conversation.unreadCounts.set(
               otherId,
@@ -128,8 +132,21 @@ async function initSocketServer(httpServer) {
           }
           await conversation.save();
 
-          // Emit to room
-          io.to(conversation._id.toString()).emit("newMessage", newMessage);
+          // Emit to room with a normalized payload so clients have a stable shape
+          const msgPayload = {
+            _id: newMessage._id,
+            conversationId: newMessage.conversationId,
+            sender: newMessage.sender,
+            receiver: newMessage.receiver,
+            type: newMessage.type,
+            content: newMessage.content || null,
+            mediaUrl: newMessage.mediaUrl || null,
+            status: newMessage.status,
+            createdAt: newMessage.createdAt,
+            updatedAt: newMessage.updatedAt,
+          };
+          console.log(`Emitting newMessage to conversation ${conversation._id}`);
+          io.to(conversation._id.toString()).emit("newMessage", msgPayload);
         });
 
         // ================== SEEN MESSAGES ==================
@@ -137,7 +154,7 @@ async function initSocketServer(httpServer) {
           await messageModel.updateMany(
             {
               conversationId,
-              receiverId: userId,
+              receiver: userId,
               status: { $in: ["sent", "delivered"] },
             },
             { $set: { status: "seen" } }
@@ -186,7 +203,6 @@ async function initSocketServer(httpServer) {
       }
     });
   });
-  
 }
 
 module.exports = initSocketServer;
