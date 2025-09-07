@@ -13,7 +13,7 @@ async function initSocketServer(httpServer) {
     cors: {
       origin: [
         "http://localhost:5173",
-        "https://roastmedia-frontend.onrender.com/",
+        "https://roastmedia-frontend.onrender.com",
       ],
       credentials: true,
     },
