@@ -14,6 +14,7 @@ async function initSocketServer(httpServer) {
       origin: [
         "http://localhost:5173",
         "https://roastmedia-frontend.onrender.com",
+        "https://kj5qc8fs-5173.inc1.devtunnels.ms/",
       ],
       credentials: true,
     },
@@ -62,20 +63,14 @@ async function initSocketServer(httpServer) {
       });
     });
 
-    // 📩 Update "sent" → "delivered" for all pending messages
-    // Mark any pending messages to this user as delivered
-    await messageModel.updateMany(
-      { receiver: userId, status: "sent" },
-      { $set: { status: "delivered" } }
-    );
-
-    // ================== CONVERSATION JOIN ==================
+    // ================== JOIN CONVERSATION ==================
     socket.on("joinConversation", async ({ otherId }) => {
       if (!otherId || otherId === userId) return;
 
+      console.log(`🔑 ${userId} joining conversation with ${otherId}`);
+
       try {
         const participants = [userId, otherId].sort();
-
         let conversation = await conversationModel.findOne({ participants });
         if (!conversation) {
           conversation = await conversationModel.create({ participants });
@@ -84,7 +79,7 @@ async function initSocketServer(httpServer) {
         socket.join(conversation._id.toString());
 
         // Send online status of other participant
-        io.to(socket.id).emit("isOtherOnline", {
+        socket.emit("isOtherOnline", {
           conversationId: conversation._id,
           otherId,
           isOnline: onlineUsers.has(otherId),
@@ -101,11 +96,18 @@ async function initSocketServer(httpServer) {
         });
 
         console.log(`📂 ${userId} joined conversation ${conversation._id}`);
+      } catch (err) {
+        console.error("Error in joinConversation:", err);
+      }
+    });
 
-        // ================== SEND MESSAGE ==================
-        socket.on("sendMessage", async ({ text, media }) => {
-          if (!text && !media) return;
+    // ================== SEND MESSAGE (global listener) ==================
+    socket.on(
+      "sendMessage",
+      async ({ conversationId, otherId, text, media }) => {
+        if (!conversationId || (!text && !media)) return;
 
+        try {
           console.log(
             `✉️ Message from ${userId} to ${otherId}: ${text || "[media]"}`
           );
@@ -118,17 +120,18 @@ async function initSocketServer(httpServer) {
           const isUserOnline = onlineUsers.has(otherId);
 
           const newMessage = await messageModel.create({
-            // If media present, treat as "image" for now (extend later for other types)
             type: media ? "image" : "text",
             sender: userId,
             receiver: otherId,
-            conversationId: conversation._id,
+            conversationId,
             ...(text && { content: text }),
             ...(media && { mediaUrl: mediaUrl.url, fileId: mediaUrl.fileId }),
             status: isUserOnline ? "delivered" : "sent",
           });
 
-          conversation.lastMessage = text || (media ? "📎 Media" : ""); // lastMessage update
+          // Update conversation lastMessage + unreadCounts
+          const conversation = await conversationModel.findById(conversationId);
+          conversation.lastMessage = text || (media ? "📎 Media" : "");
           if (!isUserOnline) {
             conversation.unreadCounts.set(
               otherId,
@@ -137,7 +140,7 @@ async function initSocketServer(httpServer) {
           }
           await conversation.save();
 
-          // Emit to room with a normalized payload so clients have a stable shape
+          // Emit to room
           const msgPayload = {
             _id: newMessage._id,
             conversationId: newMessage.conversationId,
@@ -150,40 +153,80 @@ async function initSocketServer(httpServer) {
             createdAt: newMessage.createdAt,
             updatedAt: newMessage.updatedAt,
           };
-          console.log(
-            `Emitting newMessage to conversation ${conversation._id}`
-          );
-          io.to(conversation._id.toString()).emit("newMessage", msgPayload);
-        });
+          io.to(conversationId.toString()).emit("newMessage", msgPayload);
+        } catch (err) {
+          console.error("Error in sendMessage:", err);
+        }
+      }
+    );
 
-        // ================== SEEN MESSAGES ==================
-        socket.on("seenMessages", async (conversationId) => {
-          await messageModel.updateMany(
-            {
-              conversationId,
-              receiver: userId,
-              status: { $in: ["sent", "delivered"] },
-            },
-            { $set: { status: "seen" } }
-          );
+    socket.on("deliveredMessages", async () => {
+      // Step 1: Saare pending "sent" messages jo is user ke liye aaye hai, unko delivered mark karo
+      await messageModel.updateMany(
+        {
+          receiver: userId,
+          status: "sent",
+        },
+        { $set: { status: "delivered" } }
+      );
 
-          const conv = await conversationModel.findById(conversationId);
-          conv.unreadCounts.set(userId, 0);
-          await conv.save();
+      // Step 2: Saare conversations fetch karo jisme yeh user hai
+      const conversations = await conversationModel
+        .find({ participants: userId })
+        .select("participants");
 
-          io.to(conversationId).emit("messagesSeen", {
-            userId,
-            conversationId,
+      // Step 3: Har conversation ke dusre participant (sender) ko notify karo agar online hai
+      conversations.forEach((c) => {
+        const senderId = c.participants.find(
+          (pId) => pId.toString() !== userId.toString()
+        );
+
+        if (senderId && onlineUsers.has(senderId.toString())) {
+          const senderSockets = [...onlineUsers.get(senderId.toString())];
+          io.to(senderSockets).emit("messagesDelivered", {
+            userId, // jis user ke paas deliver hua
+            conversationId: c._id, // kis conversation ka update hai
           });
+        }
+      });
+    });
+
+    // ================== SEEN MESSAGES ==================
+    socket.on("seenMessages", async (conversationId) => {
+      await messageModel.updateMany(
+        {
+          conversationId,
+          receiver: userId,
+          status: { $in: ["sent", "delivered"] },
+        },
+        { $set: { status: "seen" } }
+      );
+
+      const conv = await conversationModel.findById(conversationId);
+
+      conv.unreadCounts.set(userId, 0);
+      await conv.save();
+
+      // 👇 sender ko identify karo
+      const senderId = conv.participants.find(
+        (pId) => pId.toString() !== userId.toString()
+      );
+
+      // 👇 agar sender online hai toh usko event bhejo
+      if (onlineUsers.has(senderId.toString())) {
+        const senderSockets = [...onlineUsers.get(senderId.toString())];
+        io.to(senderSockets).emit("messagesSeen", {
+          userId, // jisne dekha
+          conversationId,
         });
-      } catch (err) {
-        console.error("Error in joinConversation:", err);
       }
     });
 
     // ================== DISCONNECT ==================
     socket.on("disconnect", async () => {
       console.log(`❌ User disconnected: ${userId} (${socket.id})`);
+
+      console.log(onlineUsers);
 
       const sockets = onlineUsers.get(userId);
       if (!sockets) return;
@@ -192,6 +235,8 @@ async function initSocketServer(httpServer) {
 
       if (sockets.size === 0) {
         onlineUsers.delete(userId);
+
+        console.log(onlineUsers);
 
         // Notify all participants this user went offline
         const conversations = await conversationModel
