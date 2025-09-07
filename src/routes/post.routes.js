@@ -57,7 +57,7 @@ router.get("/get/posts/user/:id", GetPostsByUserId);
 
 router.get("/get/single-post/:id",isUserMiddleware, getPostDetailsById);
 
-router.delete('/delete-post/:id', deletePostController)
+router.delete('/delete-post/:id', authMiddleware, deletePostController)
 
 router.patch("/:postId/share/", updateShareCountController);
 
