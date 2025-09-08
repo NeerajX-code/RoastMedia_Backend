@@ -160,7 +160,8 @@ async function initSocketServer(httpServer) {
       }
     );
 
-    socket.on("deliveredMessages", async () => {
+    socket.on("deliveredMessages", async ({userId}) => {
+      console.log(`📬 Marking messages as delivered for userId: ${userId}`);
       // Step 1: Saare pending "sent" messages jo is user ke liye aaye hai, unko delivered mark karo
       await messageModel.updateMany(
         {
@@ -243,9 +244,12 @@ async function initSocketServer(httpServer) {
           .find({ participants: userId })
           .select("participants");
 
+        console.log("conversations:", conversations);
+
         conversations.forEach((c) => {
           c.participants.forEach((pId) => {
             if (onlineUsers.has(pId.toString())) {
+              console.log("Notifying userId:", pId.toString());
               io.to([...onlineUsers.get(pId.toString())]).emit("userOffline", {
                 userId,
               });
