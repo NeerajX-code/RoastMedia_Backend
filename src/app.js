@@ -5,12 +5,18 @@ const authRouter = require("./routes/auth.routes");
 const postRouter = require("./routes/post.routes");
 const userRouter = require("./routes/user.routes");
 const notificationRouter = require("./routes/notification.routes");
+const path = require("path");
 
 
 const app = express();
 
 app.use(express.json({ limit: '1mb' }));
 app.use(cookieParser());
+app.use(express.static(path.join(__dirname, '../public')));
+
+app.get("*name", (req, res) => {
+  res.sendFile(path.join(__dirname, "../public/index.html"));
+});
 
 const allowedOrigins = [
   "http://localhost:5173",
