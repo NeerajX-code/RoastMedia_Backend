@@ -6,6 +6,7 @@ const postRouter = require("./routes/post.routes");
 const userRouter = require("./routes/user.routes");
 const notificationRouter = require("./routes/notification.routes");
 
+
 const app = express();
 
 app.use(express.json({ limit: '1mb' }));
@@ -29,5 +30,6 @@ app.use("/api/auth", authRouter);
 app.use("/api/post", postRouter);
 app.use("/api/user", userRouter);
 app.use("/api/notifications", notificationRouter);
+
 
 module.exports = app;

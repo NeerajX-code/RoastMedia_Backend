@@ -5,6 +5,7 @@ const jwt = require("jsonwebtoken");
 const conversationModel = require("../models/conversation.model");
 const userModel = require("../models/user.model");
 const { uploadImage } = require("../services/cloud.service");
+const userProfileModel = require("../models/userProfile.model");
 
 const onlineUsers = new Map(); // userId -> Set of socketIds
 
@@ -85,6 +86,10 @@ async function initSocketServer(httpServer) {
           isOnline: onlineUsers.has(otherId),
         });
 
+        const userData = await userProfileModel
+          .findOne({ userId: otherId })
+          .select("displayName avatarUrl");
+
         // Send old messages
         const messages = await messageModel
           .find({ conversationId: conversation._id })
@@ -93,11 +98,53 @@ async function initSocketServer(httpServer) {
         socket.emit("conversationMessages", {
           conversationId: conversation._id,
           messages,
+          otherUser: userData,
         });
 
         console.log(`📂 ${userId} joined conversation ${conversation._id}`);
       } catch (err) {
         console.error("Error in joinConversation:", err);
+      }
+    });
+
+    socket.on("getConversations", async () => {
+      if (!userId) return;
+
+      console.log(userId, "requested conversations list");
+      
+
+      try {
+        const conversations = await conversationModel
+          .find({ participants: userId })
+          .sort({ updatedAt: -1 })
+          .lean();
+
+        const detailedConversations = conversations.map(async (conv) => {
+          const otherParticipantId = conv.participants.find(
+            (pId) => pId.toString() !== userId.toString()
+          );
+
+          const otherParticipantData = await userProfileModel
+            .findOne({
+              userId: otherParticipantId,
+            })
+            .select("displayName avatarUrl");
+
+          return {
+            _id: conv._id,
+            participants: conv.participants,
+            lastMessage: conv.lastMessage,
+            unreadCounts: conv.unreadCounts,
+            otherParticipantId,
+            otherParticipantData,
+          };
+        });
+
+        socket.emit("conversationsList", {
+          conversations: await Promise.all(detailedConversations),
+        });
+      } catch (err) {
+        console.error("Error in getConversations:", err);
       }
     });
 
@@ -160,7 +207,7 @@ async function initSocketServer(httpServer) {
       }
     );
 
-    socket.on("deliveredMessages", async ({userId}) => {
+    socket.on("deliveredMessages", async ({ userId }) => {
       console.log(`📬 Marking messages as delivered for userId: ${userId}`);
       // Step 1: Saare pending "sent" messages jo is user ke liye aaye hai, unko delivered mark karo
       await messageModel.updateMany(
@@ -193,6 +240,7 @@ async function initSocketServer(httpServer) {
     });
 
     // ================== SEEN MESSAGES ==================
+    
     socket.on("seenMessages", async (conversationId) => {
       await messageModel.updateMany(
         {
