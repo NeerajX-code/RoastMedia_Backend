@@ -49,6 +49,8 @@ async function initSocketServer(httpServer) {
     }
     onlineUsers.get(userId).add(socket.id);
 
+    socket.join(userId.toString());
+
     // 🔔 Notify participants that this user is online
     const conversations = await conversationModel
       .find({ participants: userId })
@@ -111,7 +113,6 @@ async function initSocketServer(httpServer) {
       if (!userId) return;
 
       console.log(userId, "requested conversations list");
-      
 
       try {
         const conversations = await conversationModel
@@ -179,13 +180,15 @@ async function initSocketServer(httpServer) {
           // Update conversation lastMessage + unreadCounts
           const conversation = await conversationModel.findById(conversationId);
           conversation.lastMessage = text || (media ? "📎 Media" : "");
-          if (!isUserOnline) {
-            conversation.unreadCounts.set(
-              otherId,
-              (conversation.unreadCounts.get(otherId) || 0) + 1
-            );
-          }
+
+          conversation.unreadCounts.set(
+            otherId,
+            (conversation.unreadCounts.get(otherId) || 0) + 1
+          );
+
           await conversation.save();
+
+          console.log("updated Conversation", conversation);
 
           // Emit to room
           const msgPayload = {
@@ -200,7 +203,13 @@ async function initSocketServer(httpServer) {
             createdAt: newMessage.createdAt,
             updatedAt: newMessage.updatedAt,
           };
+
+          console.log(otherId);
+
           io.to(conversationId.toString()).emit("newMessage", msgPayload);
+          if (isUserOnline) {
+            io.to(otherId.toString()).emit("updatedConversation", conversation);
+          }
         } catch (err) {
           console.error("Error in sendMessage:", err);
         }
@@ -240,7 +249,7 @@ async function initSocketServer(httpServer) {
     });
 
     // ================== SEEN MESSAGES ==================
-    
+
     socket.on("seenMessages", async (conversationId) => {
       await messageModel.updateMany(
         {
